@@ -7,7 +7,7 @@
 "Check this code for security vulnerabilities and code quality issues."
 
 ## Deletion Guard
-"Does this code perform file/database deletions? Highlight any risk."
+"Does this code perform file/database deletions or file removals? Highlight any risk."
 
 ## Refactor Suggestion
 "Suggest architectural or design improvements for this file."
