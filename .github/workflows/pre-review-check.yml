@@ -1,0 +1,65 @@
+name: Pre-Review Full Rule Enforcement
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  full-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pygit2
+
+      - name: Install Node Dependencies
+        run: |
+          npm install --legacy-peer-deps || true
+
+      - name: Lint and Audit
+        run: |
+          npm run lint || echo "⚠️ Lint issues found"
+          npm audit --audit-level=moderate || echo "⚠️ Vulnerabilities detected"
+
+      - name: Check for Dangerous Deletions
+        run: |
+          git diff --name-status origin/${{ github.base_ref }}...HEAD | grep ^D && \
+          echo "❌ File deletion detected. Manual approval required." && exit 1 || echo "✅ No deletions detected"
+
+      - name: Semantic Diff + Risk Analysis
+        run: |
+          echo "=== Semantic Diff Analysis ==="
+          base_branch="${{ github.base_ref }}"
+          git fetch origin $base_branch
+          diff=$(git diff origin/$base_branch...HEAD)
+          echo "$diff" > diff.txt
+
+          risk="Low"
+          if echo "$diff" | grep -E 'DROP|DELETE|TRUNCATE|rm\\s|unlink|localStorage\\.clear'; then
+            echo "⚠️ Potential destructive operation found (SQL/File/Storage)."
+            risk="High"
+          fi
+
+          if echo "$diff" | grep -E 'eval\\(|exec\\('; then
+            echo "⚠️ Use of unsafe functions like eval/exec detected."
+            risk="Medium"
+          fi
+
+          if [ $(echo "$diff" | wc -c) -gt 10000 ]; then
+            echo "⚠️ Large code change detected, may require manual review."
+            risk="Medium"
+          fi
+
+          echo "Risk Level: $risk"
+          echo "If HIGH, request manual review before merging."
+
+      - name: Upload Diff for Review
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-diff
+          path: diff.txt
