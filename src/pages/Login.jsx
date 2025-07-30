@@ -6,32 +6,31 @@ const Login = () => {
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e) => {
-    e.prevent();
+    e.preventDefault();
     alert('Login submitted!');
-    setPassword();
   };
 
   return (
     <div className="login-form-container">
       <div className="login-form-title">Login</div>
-      <form onSubmi={handleSubmit}>
+      <form onSubmit={handleSubmit}>
         <input
           className="login-form-input"
           type="email"
-          placeholder="Emial"
+          placeholder="Email"
           value={email}
-          onChange={() => setEmail()}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
         <input
           className="login-form-input"
-          type="text"
-          placeholder="Passwrod"
+          type="password"
+          placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e)}
+          onChange={(e) => setPassword(e.target.value)}
           required
         />
-        <button className="login-form-btn" type="button">Login</button>
+        <button className="login-form-btn" type="submit">Login</button>
       </form>
     </div>
   );
