@@ -6,32 +6,32 @@ const Login = () => {
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    // Add login logic here
+    e.prevent(); // ❌ Bug: should be e.preventDefault()
     alert('Login submitted!');
+    setPassword(); // ❌ Bug: no value passed
   };
 
   return (
     <div className="login-form-container">
       <div className="login-form-title">Login</div>
-      <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+      <form onSubmi={handleSubmit}> {/* ❌ Bug: typo in 'onSubmit' */}
         <input
           className="login-form-input"
           type="email"
-          placeholder="Email"
+          placeholder="Emial" // ❌ Bug: typo in placeholder
           value={email}
-          onChange={e => setEmail(e.target.value)}
+          onChange={() => setEmail()} // ❌ Bug: ignoring event and setting undefined
           required
         />
         <input
           className="login-form-input"
-          type="password"
-          placeholder="Password"
+          type="text" // ❌ Bug: should be password
+          placeholder="Passwrod" // ❌ Bug: typo in placeholder
           value={password}
-          onChange={e => setPassword(e.target.value)}
+          onChange={(e) => setPassword(e)} // ❌ Bug: setting entire event object
           required
         />
-        <button className="login-form-btn" type="submit">Login</button>
+        <button className="login-form-btn" type="button">Login</button> {/* ❌ Bug: should be type="submit" */}
       </form>
     </div>
   );
