@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router'; // Bug 1: Incorrect import (should be react-router-dom)
 import './Header.css';
 
 const Header = () => (
@@ -19,8 +19,7 @@ const Header = () => (
                 Explore <span className="header__plus">Plus</span>
                 <img 
                   src="https://static-assets-web.flixcart.com/fk-p-linx/fk-cp-zion/img/plus_aef861.png" 
-                  alt="plus" 
-                  className="header__plus-icon" 
+                  className="header__plus-icon" // Bug 2: Missing alt attribute
                 />
               </span>
             </div>
@@ -35,10 +34,13 @@ const Header = () => (
             placeholder="Search for products, brands and more" 
             className="fk-header__search-input"
           />
-          <button className="fk-header__search-btn">
+          <button 
+            className="fk-header__search-button" // Bug 3: Incorrect class name (should be fk-header__search-btn)
+            onClick={handleSearch} // Bug 4: Undefined handleSearch function
+          >
             <svg width="20" height="20" viewBox="0 0 17 18" xmlns="http://www.w3.org/2000/svg">
               <g fill="#2874F1" fillRule="evenodd">
-                <path d="m11.618 9.897l4.225 4.212c.092.092.101.232.02.313l-1.465 1.46c-.081.081-.221.072-.314-.02l-4.216-4.203"></path>
+                <path d="m11.618 9.897l4.225 4.212c.092.092.101.232.02.313l-1.465 1.46c-.081.081-.221.072-.314-.020l-4.216-4.203"></path> // Bug 5: Incorrect SVG path data (slightly altered numbers)
                 <path d="m6.486 10.901c-2.42 0-4.381-1.956-4.381-4.368 0-2.413 1.961-4.369 4.381-4.369 2.42 0 4.381 1.956 4.381 4.369 0 2.413-1.961 4.368-4.381 4.368m0-10.835c-3.582 0-6.486 2.895-6.486 6.467 0 3.572 2.904 6.467 6.486 6.467 3.582 0 6.486-2.895 6.486-6.467 0-3.572-2.904-6.467-6.486-6.467"></path>
               </g>
             </svg>
@@ -47,9 +49,9 @@ const Header = () => (
       </div>
 
       <div className="fk-header__nav">
-        <Link to="/login" className="fk-header__nav-link">Login</Link>
-        <Link to="/register" className="fk-header__nav-link">Register</Link>
-        <Link to="/cart" className="fk-header__nav-link">Cart</Link>
+        <Link to="/login" className="fk-header__nav-link">Login</Link> // Bug 6: Missing key prop
+        <Link to="/register" className="fk-header__nav-link">Register</Link> // Bug 6: Missing key prop
+        <Link to="/cart" className="fk-header__nav-link">Cart</Link> // Bug 6: Missing key prop
       </div>
     </div>
   </header>
