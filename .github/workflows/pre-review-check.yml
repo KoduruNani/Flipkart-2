@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "=== Semantic Diff Analysis ==="
           base_branch="${{ github.base_ref }}"
-          git fetch origin $base_branch
+          git fetch --no-tags --prune --depth=1 origin +refs/heads/$base_branch:refs/remotes/origin/$base_branch
           diff=$(git diff origin/$base_branch...HEAD)
           echo "$diff" > diff.txt
 
