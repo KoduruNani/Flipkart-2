@@ -1,0 +1,39 @@
+name: Pre-Review Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  analyze-code:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openai pygit2
+
+      - name: Run Semantic Diff Analysis
+        run: |
+          python scripts/analyze_diff.py > diff_analysis.txt
+          cat diff_analysis.txt
+
+      - name: Upload Analysis Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: diff-analysis
+          path: diff_analysis.txt
+
+      - name: Lint and Security Scan
+        run: |
+          npm install --legacy-peer-deps || true
+          npm run lint || echo "⚠️ Lint issues found"
+          npm audit --audit-level=moderate || echo "⚠️ Vulnerabilities detected"
+
+      - name: Check for Dangerous Deletions
+        run: |
+          git diff --name-status origin/${{ github.base_ref }}...HEAD | grep ^D && \
+          echo "❌ File deletion detected. Manual approval required." && exit 1 || echo "✅ No deletions detected"
