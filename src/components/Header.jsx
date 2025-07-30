@@ -4,10 +4,25 @@ import './Header.css';
 
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      console.log('Searching for:', searchQuery);
+  const handleSearch = async (e) => {
+    if (e) {
+      e.preventDefault();
+    }
+    
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery || isSearching) return;
+
+    try {
+      setIsSearching(true);
+      // TODO: Implement actual search API call
+      console.log('Searching for:', trimmedQuery);
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+    } catch (error) {
+      console.error('Search failed:', error);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -39,32 +54,39 @@ const Header = () => {
 
         <div className="header__search">
           <div className="header__search-container">
-            <input 
-              type="text" 
-              placeholder="Search for products, brands and more" 
-              className="header__search-input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <button 
-              className="header__search-button"
-              onClick={handleSearch}
-            >
-              <svg width="20" height="20" viewBox="0 0 17 18" xmlns="http://www.w3.org/2000/svg">
-                <g fill="#2874F1" fillRule="evenodd">
-                  <path d="m11.618 9.897l4.225 4.212c.092.092.101.232.02.313l-1.465 1.46c-.081.081-.221.072-.314-.020l-4.216-4.203" />
-                  <path d="m6.486 10.901c-2.42 0-4.381-1.956-4.381-4.368 0-2.413 1.961-4.369 4.381-4.369 2.42 0 4.381 1.956 4.381 4.369 0 2.413-1.961 4.368-4.381 4.368m0-10.835c-3.582 0-6.486 2.895-6.486 6.467 0 3.572 2.904 6.467 6.486 6.467 3.582 0 6.486-2.895 6.486-6.467 0-3.572-2.904-6.467-6.486-6.467" />
-                </g>
-              </svg>
-            </button>
+            <form onSubmit={handleSearch} role="search">
+              <input 
+                type="search" 
+                placeholder="Search for products, brands and more" 
+                className="header__search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search products"
+                disabled={isSearching}
+              />
+              <button 
+                className="header__search-button"
+                onClick={handleSearch}
+                disabled={isSearching}
+                aria-label="Search"
+                type="submit"
+              >
+                <svg width="20" height="20" viewBox="0 0 17 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <g fill="#2874F1" fillRule="evenodd">
+                    <path d="m11.618 9.897l4.225 4.212c.092.092.101.232.02.313l-1.465 1.46c-.081.081-.221.072-.314-.020l-4.216-4.203" />
+                    <path d="m6.486 10.901c-2.42 0-4.381-1.956-4.381-4.368 0-2.413 1.961-4.369 4.381-4.369 2.42 0 4.381 1.956 4.381 4.369 0 2.413-1.961 4.368-4.381 4.368m0-10.835c-3.582 0-6.486 2.895-6.486 6.467 0 3.572 2.904 6.467 6.486 6.467 3.582 0 6.486-2.895 6.486-6.467 0-3.572-2.904-6.467-6.486-6.467" />
+                  </g>
+                </svg>
+              </button>
+            </form>
           </div>
         </div>
 
-        <div className="header__nav">
+        <nav className="header__nav" aria-label="Main navigation">
           <Link to="/login" className="header__nav-link">Login</Link>
           <Link to="/register" className="header__nav-link">Register</Link>
           <Link to="/cart" className="header__nav-link">Cart</Link>
-        </div>
+        </nav>
       </div>
     </header>
   );
