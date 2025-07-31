@@ -196,7 +196,13 @@ jobs:
           if [ "${{ env.AUDIT_STATUS }}" != "0" ]; then
             echo "::warning::Security vulnerabilities detected. Please review the audit report."
           fi
+          # Option 1: Keep failure for High risk (Recommended)
           if [ "${{ env.DELETIONS_FOUND }}" == "true" ] || [ "${{ env.RISK_LEVEL }}" == "High" ]; then
             echo "::error::Action required: File deletions or High risk detected. Manual review required."
             exit 1
           fi
+          # Option 2: Allow High risk without failure (Uncomment to use)
+          # if [ "${{ env.DELETIONS_FOUND }}" == "true" ]; then
+          #   echo "::error::Action required: File deletions detected. Manual review required."
+          #   exit 1
+          # fi
