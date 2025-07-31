@@ -1,3 +1,82 @@
+# name: Pre-Review Full Rule Enforcement
+
+# on:
+#   pull_request:
+#     types: [opened, synchronize, reopened]
+
+# jobs:
+#   full-review:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v4
+
+#       - name: Install Python Dependencies
+#         run: |
+#           python -m pip install --upgrade pip
+#           pip install pygit2
+
+#       - name: Install Node Dependencies
+#         run: |
+#           npm install --legacy-peer-deps || true
+
+#       - name: Lint and Audit
+#         run: |
+#           npm run lint || echo "⚠️ Lint issues found"
+#           npm audit --audit-level=moderate || echo "⚠️ Vulnerabilities detected"
+
+#       - name: Check for Dangerous Deletions
+#         run: |
+#           git diff --name-status origin/${{ github.base_ref }}...HEAD | grep ^D && \
+#           echo "❌ File deletion detected. Manual approval required." && exit 1 || echo "✅ No deletions detected"
+
+#       - name: Semantic Diff + Risk Analysis
+#         run: |
+#           echo "=== Semantic Diff Analysis ==="
+#           base_branch="${{ github.base_ref }}"
+
+#           # Ensure complete history is available
+#           git fetch --no-tags --prune --unshallow || true
+#           git fetch origin $base_branch:$base_branch
+
+#           # Validate merge base existence before diff
+#           if git merge-base --is-ancestor $base_branch HEAD; then
+#             diff=$(git diff $base_branch...HEAD)
+#             echo "$diff" > diff.txt
+
+#             risk="Low"
+#             if echo "$diff" | grep -E 'DROP|DELETE|TRUNCATE|rm\\s|unlink|localStorage\\.clear'; then
+#               echo "⚠️ Potential destructive operation found (SQL/File/Storage)."
+#               risk="High"
+#             fi
+
+#             if echo "$diff" | grep -E 'eval\\(|exec\\('; then
+#               echo "⚠️ Use of unsafe functions like eval/exec detected."
+#               risk="Medium"
+#             fi
+
+#             if [ $(echo "$diff" | wc -c) -gt 10000 ]; then
+#               echo "⚠️ Large code change detected, may require manual review."
+#               risk="Medium"
+#             fi
+
+#             echo "Risk Level: $risk"
+#             echo "If HIGH, request manual review before merging."
+#           else
+#             echo "❌ No common ancestor with $base_branch. Skipping diff check."
+#             echo "" > diff.txt
+#           fi
+
+#       - name: Upload Diff for Review
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: code-diff
+#           path: diff.txt
+
+
+
+
 name: Pre-Review Full Rule Enforcement
 
 on:
@@ -43,33 +122,54 @@ jobs:
           # Validate merge base existence before diff
           if git merge-base --is-ancestor $base_branch HEAD; then
             diff=$(git diff $base_branch...HEAD)
-            echo "$diff" > diff.txt
+
+            # Generate HTML table
+            cat << 'EOF' > diff.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Diff Analysis Report</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; max-width: 800px; margin: 20px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    tr:hover { background-color: #f1f1f1; }
+  </style>
+</head>
+<body>
+  <h2>Semantic Diff Analysis</h2>
+  <table>
+    <tr><th>Change</th><th>Description</th><th>Risk Level</th></tr>
+EOF
 
             risk="Low"
             if echo "$diff" | grep -E 'DROP|DELETE|TRUNCATE|rm\\s|unlink|localStorage\\.clear'; then
-              echo "⚠️ Potential destructive operation found (SQL/File/Storage)."
+              echo "<tr><td>Destructive Operation</td><td>⚠️ Potential destructive operation found (SQL/File/Storage).</td><td>High</td></tr>" >> diff.html
               risk="High"
             fi
 
             if echo "$diff" | grep -E 'eval\\(|exec\\('; then
-              echo "⚠️ Use of unsafe functions like eval/exec detected."
+              echo "<tr><td>Unsafe Function</td><td>⚠️ Use of unsafe functions like eval/exec detected.</td><td>Medium</td></tr>" >> diff.html
               risk="Medium"
             fi
 
             if [ $(echo "$diff" | wc -c) -gt 10000 ]; then
-              echo "⚠️ Large code change detected, may require manual review."
+              echo "<tr><td>Large Change</td><td>⚠️ Large code change detected, may require manual review.</td><td>Medium</td></tr>" >> diff.html
               risk="Medium"
             fi
 
-            echo "Risk Level: $risk"
-            echo "If HIGH, request manual review before merging."
+            echo "<tr><td>Overall Risk</td><td></td><td>$risk</td></tr>" >> diff.html
+            echo "</table>" >> diff.html
+            echo "<p>If risk is High, request manual review before merging.</p>" >> diff.html
+            echo "</body></html>" >> diff.html
           else
-            echo "❌ No common ancestor with $base_branch. Skipping diff check."
-            echo "" > diff.txt
+            echo "<!DOCTYPE html><html><body><p>❌ No common ancestor with $base_branch. Skipping diff check.</p></body></html>" > diff.html
           fi
 
       - name: Upload Diff for Review
         uses: actions/upload-artifact@v4
         with:
           name: code-diff
-          path: diff.txt
+          path: diff.html
