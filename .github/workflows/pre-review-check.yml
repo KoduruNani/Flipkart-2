@@ -169,13 +169,14 @@ jobs:
             risk="Low"
           fi
 
-          # Generate final report with fallback
+          # Generate final report with fallback and add date/time
           cp report_template.html diff.html
           if [ -z "$results" ]; then
             sed -i "s|<!-- ANALYSIS_RESULTS -->|<tr><td colspan=\"3\">No significant findings</td></tr>|" diff.html
           else
             sed -i "s|<!-- ANALYSIS_RESULTS -->|$results|" diff.html
           fi
+          echo "<p>Report generated on: 03:25 PM IST, Thursday, July 31, 2025</p>" >> diff.html
           
           # Set output for subsequent steps
           echo "RISK_LEVEL=${risk:-Low}" >> $GITHUB_ENV
