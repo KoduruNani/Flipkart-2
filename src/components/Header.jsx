@@ -6,6 +6,9 @@ const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
+  const [searchResults, setSearchResults] = useState([]);
+  const [showResults, setShowResults] = useState(false);
+
   const handleSearch = async (e) => {
     if (e) {
       e.preventDefault();
@@ -16,11 +19,12 @@ const Header = () => {
 
     try {
       setIsSearching(true);
-      // TODO: Implement actual search API call
-      console.log('Searching for:', trimmedQuery);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+      const results = await searchProducts(trimmedQuery);
+      setSearchResults(results);
+      setShowResults(true);
     } catch (error) {
       console.error('Search failed:', error);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }

@@ -124,3 +124,16 @@ export const batchDeleteProducts = async (productIds, options = {}) => {
 
   return results;
 };
+
+// Search products by query
+export const searchProducts = async (query) => {
+  if (!query) throw new Error('Search query is required');
+  
+  const products = await getProducts();
+  const searchTerms = query.toLowerCase().split(' ');
+  
+  return products.filter(product => {
+    const searchText = `${product.title} ${product.description} ${product.category}`.toLowerCase();
+    return searchTerms.every(term => searchText.includes(term));
+  });
+};
