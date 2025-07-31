@@ -30,7 +30,7 @@ const Header = () => {
     <header className="header">
       <div className="header__container">
         <div className="header__left">
-          <a href="/" className="header__logo-link">
+          <Link to="/" className="header__logo-link">
             <div className="header__logo-wrapper">
               <img 
                 src="https://static-assets-web.flixcart.com/fk-p-linx/fk-cp-zion/img/flipkart-plus_8d85f4.png" 
@@ -49,7 +49,10 @@ const Header = () => {
                 </span>
               </div>
             </div>
-          </a>
+          </Link>
+          <nav className="header__nav">
+            <Link to="/products" className="header__nav-link">Products</Link>
+          </nav>
         </div>
 
         <div className="header__search">
