@@ -49,3 +49,14 @@
 .login-form-btn:hover {
   background: #e85a19;
 }
+
+.login-form-error {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background-color: #fdecea;
+  color: #dc3545;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+}

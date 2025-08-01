@@ -3,63 +3,274 @@ name: Pre-Review Full Rule Enforcement
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - master
+      - develop
 
 jobs:
   full-review:
+    name: Code Review and Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pygit2
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
       - name: Install Node Dependencies
         run: |
-          npm install --legacy-peer-deps || true
+          npm ci || npm install --legacy-peer-deps
 
-      - name: Lint and Audit
+      - name: Run ESLint
+        id: lint
+        continue-on-error: true
         run: |
-          npm run lint || echo "⚠️ Lint issues found"
-          npm audit --audit-level=moderate || echo "⚠️ Vulnerabilities detected"
+          npm run lint > lint-report.txt 2>&1
+          echo "LINT_STATUS=$?" >> $GITHUB_ENV
+
+      - name: Run Security Audit
+        id: audit
+        continue-on-error: true
+        run: |
+          npm audit --audit-level=moderate > audit-report.txt 2>&1
+          echo "AUDIT_STATUS=$?" >> $GITHUB_ENV
 
       - name: Check for Dangerous Deletions
+        id: deletion-check
         run: |
-          git diff --name-status origin/${{ github.base_ref }}...HEAD | grep ^D && \
-          echo "❌ File deletion detected. Manual approval required." && exit 1 || echo "✅ No deletions detected"
+          DELETED_FILES=$(git diff --name-status origin/${{ github.base_ref }}...HEAD | grep ^D || true)
+          if [ ! -z "$DELETED_FILES" ]; then
+            echo "::warning::The following files are being deleted:"
+            echo "$DELETED_FILES"
+            echo "DELETIONS_FOUND=true" >> $GITHUB_ENV
+          else
+            echo "✅ No deletions detected"
+            echo "DELETIONS_FOUND=false" >> $GITHUB_ENV
+          fi
 
-      - name: Semantic Diff + Risk Analysis
+      - name: Create Report Template
         run: |
-          echo "=== Semantic Diff Analysis ==="
+          cat << 'EOF' > report_template.html
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>Diff Analysis Report</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
+              .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+              table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+              th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: top; }
+              th { background-color: #f5f5f5; font-weight: 600; }
+              tr:nth-child(even) { background-color: #fafafa; }
+              tr:hover { background-color: #f0f0f0; }
+              .risk-high { color: #d73a49; font-weight: bold; }
+              .risk-medium { color: #e36209; font-weight: bold; }
+              .risk-low { color: #28a745; font-weight: bold; }
+              .warning { color: #e36209; }
+              .error { color: #d73a49; font-weight: bold; }
+              .code { font-family: monospace; background: #f6f8fa; padding: 2px 4px; border-radius: 3px; }
+              .file-info { color: #666; margin: 5px 0; }
+              .suggestion { background: #fff8c5; padding: 8px; border-left: 4px solid #ffd33d; margin: 5px 0; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h2>Semantic Diff Analysis Report</h2>
+              <table>
+                <tr>
+                  <th>Change Type</th>
+                  <th>Details</th>
+                  <th>Risk Level</th>
+                </tr>
+                <!-- ANALYSIS_RESULTS -->
+              </table>
+              <div id="summary"></div>
+              <div id="logs">
+                <h3>Lint Report</h3>
+                <pre class="code"><!-- LINT_REPORT --></pre>
+                <h3>Audit Report</h3>
+                <pre class="code"><!-- AUDIT_REPORT --></pre>
+              </div>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Semantic Diff Analysis
+        id: diff-analysis
+        run: |
+          echo "=== Running Semantic Diff Analysis ==="
           base_branch="${{ github.base_ref }}"
-          git fetch origin $base_branch
-          diff=$(git diff origin/$base_branch...HEAD)
-          echo "$diff" > diff.txt
 
+          # Create temporary directory for reports
+          mkdir -p ./reports
+
+          # Ensure complete history is available
+          git fetch --no-tags --prune --unshallow 2>/dev/null || echo "::warning::Unable to fetch full history"
+          git fetch origin "$base_branch:$base_branch" 2>log.txt || { 
+            echo "::error::Failed to fetch $base_branch. Check log.txt for details"
+            exit 1
+          }
+
+          # Initialize risk level and results file
           risk="Low"
-          if echo "$diff" | grep -E 'DROP|DELETE|TRUNCATE|rm\\s|unlink|localStorage\\.clear'; then
-            echo "⚠️ Potential destructive operation found (SQL/File/Storage)."
-            risk="High"
+          results_file="./reports/results.html"
+          echo "" > "$results_file"
+
+          # Function to add a finding with detailed information
+          add_finding() {
+            local change="$1"
+            local description="$2"
+            local risk_level="$3"
+            local file_path="$4"
+            local line_num="$5"
+            local code_snippet="$6"
+            local suggestion="$7"
+            
+            printf "<tr>
+              <td>%s</td>
+              <td>
+                <div><strong>Issue:</strong> %s</div>
+                <div class='file-info'><strong>File:</strong> %s:%s</div>
+                <div class='code'>%s</div>
+                <div class='suggestion'><strong>Suggestion:</strong> %s</div>
+              </td>
+              <td class='risk-%s'>%s</td>
+            </tr>\n" \
+              "$change" \
+              "$description" \
+              "$file_path" \
+              "$line_num" \
+              "$code_snippet" \
+              "$suggestion" \
+              "$risk_level" \
+              "$risk_level" >> "$results_file"
+          }
+
+          # Function to check patterns in diff and add findings
+          check_pattern() {
+            local pattern="$1"
+            local change_type="$2"
+            local risk_level="$3"
+            local description="$4"
+            local suggestion="$5"
+
+            git diff "$base_branch"...HEAD -U0 | while IFS= read -r line; do
+              if echo "$line" | grep -E "$pattern" >/dev/null 2>&1; then
+                file_path=$(echo "$line" | sed -n 's/^+++ b\(.*\)/\1/p')
+                line_num=$(echo "$line" | grep -n '^@@' | cut -d: -f1)
+                code_snippet=$(echo "$line" | grep -E "$pattern" | head -n 1)
+                
+                if [ ! -z "$file_path" ] && [ ! -z "$line_num" ]; then
+                  add_finding "$change_type" "$description" "$risk_level" "$file_path" "$line_num" "$code_snippet" "$suggestion"
+                  [ "$risk_level" = "high" ] && risk="High"
+                  [ "$risk_level" = "medium" ] && [ "$risk" != "High" ] && risk="Medium"
+                fi
+              fi
+            done
+          }
+
+          # Check for API security issues and error handling
+          check_pattern "https?://[^\"']*api" \
+            "API Security" \
+            "high" \
+            "⚠️ Insecure API endpoint detected" \
+            "Use HTTPS and environment variables for API endpoints"
+
+          check_pattern "console\\.error" \
+            "Error Handling" \
+            "medium" \
+            "⚠️ Direct console error logging detected" \
+            "Implement proper error logging and monitoring"
+
+          # Check for unsafe functions
+          check_pattern "eval\\|exec\\|Function\\|setTimeout.*,\\|setInterval.*," \
+            "Unsafe Function" \
+            "medium" \
+            "⚠️ Use of unsafe functions detected" \
+            "Replace unsafe functions with secure alternatives"
+
+          # Check for sensitive data
+          check_pattern "\\(password\\|secret\\|token\\)[\"']?[[:space:]]*[:=]" \
+            "Sensitive Data" \
+            "medium" \
+            "⚠️ Changes involving sensitive data detected" \
+            "Ensure sensitive data is properly encrypted and not exposed in logs"
+
+          # Add lint and audit reports
+          if [ -f "lint-report.txt" ]; then
+            lint_report=$(cat lint-report.txt)
+            awk -v report="$lint_report" '
+              /<!-- LINT_REPORT -->/ { print report; next }
+              { print }
+            ' diff.html > diff.tmp && mv diff.tmp diff.html
           fi
 
-          if echo "$diff" | grep -E 'eval\\(|exec\\('; then
-            echo "⚠️ Use of unsafe functions like eval/exec detected."
-            risk="Medium"
+          if [ -f "audit-report.txt" ]; then
+            audit_report=$(cat audit-report.txt)
+            awk -v report="$audit_report" '
+              /<!-- AUDIT_REPORT -->/ { print report; next }
+              { print }
+            ' diff.html > diff.tmp && mv diff.tmp diff.html
           fi
 
-          if [ $(echo "$diff" | wc -c) -gt 10000 ]; then
-            echo "⚠️ Large code change detected, may require manual review."
-            risk="Medium"
+          # Generate final report
+          cp report_template.html diff.html
+          if [ ! -s "$results_file" ]; then
+            echo "<tr><td colspan='3'>No significant findings</td></tr>" > "$results_file"
           fi
+          
+          # Replace placeholders in the template
+          results_content=$(cat "$results_file")
+          awk -v results="$results_content" '
+            /<!-- ANALYSIS_RESULTS -->/ { print results; next }
+            { print }
+          ' report_template.html > diff.html
 
-          echo "Risk Level: $risk"
-          echo "If HIGH, request manual review before merging."
+          # Set output for subsequent steps
+          echo "RISK_LEVEL=${risk:-Low}" >> $GITHUB_ENV
 
       - name: Upload Diff for Review
         uses: actions/upload-artifact@v4
         with:
-          name: code-diff
-          path: diff.txt
+          name: code-diff-analysis
+          path: diff.html
+          retention-days: 7
+
+      - name: Check Results
+        if: always()
+        run: |
+          if [ "${{ env.LINT_STATUS }}" != "0" ] && [ ! -z "${{ env.LINT_STATUS }}" ]; then
+            echo "::warning::Linting issues found. Please review the logs."
+          fi
+          if [ "${{ env.AUDIT_STATUS }}" != "0" ] && [ ! -z "${{ env.AUDIT_STATUS }}" ]; then
+            echo "::warning::Security vulnerabilities detected. Please review the audit report."
+          fi
+          # Check for critical conditions
+          if [ "${{ env.DELETIONS_FOUND }}" == "true" ] && [ "${{ env.RISK_LEVEL }}" == "High" ]; then
+            echo "::error::Action required: File deletions or High risk detected. Manual review required."
+            exit 1
+          fi

@@ -1,37 +1,70 @@
+// Login.jsx
 import React, { useState } from 'react';
 import './Login.css';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
-    e.prevent();
-    alert('Login submitted!');
-    setPassword();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://example.com/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+
+      // Handle successful login
+      const data = await response.json();
+      // TODO: Store token and redirect
+      console.log('Login successful:', data);
+    } catch (err) {
+      setError('Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="login-form-container">
       <div className="login-form-title">Login</div>
-      <form onSubmi={handleSubmit}>
+      {error && <div className="login-form-error">{error}</div>}
+      <form onSubmit={handleSubmit}>
         <input
           className="login-form-input"
           type="email"
-          placeholder="Emial"
+          placeholder="Email"
           value={email}
-          onChange={() => setEmail()}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
         <input
           className="login-form-input"
-          type="text"
-          placeholder="Passwrod"
+          type="password"
+          placeholder="Password"
           value={password}
-          onChange={(e) => setPassword(e)}
+          onChange={(e) => setPassword(e.target.value)}
           required
         />
-        <button className="login-form-btn" type="button">Login</button>
+        <button 
+          className="login-form-btn" 
+          type="submit"
+          disabled={loading}
+        >
+          {loading ? 'Logging in...' : 'Login'}
+        </button>
       </form>
     </div>
   );
