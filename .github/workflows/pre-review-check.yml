@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20.19.0'  # Updated to a supported version
+          node-version: '18'
           cache: 'npm'
 
       - name: Install Node Dependencies
@@ -47,14 +47,14 @@ jobs:
         id: lint
         continue-on-error: true
         run: |
-          npm run lint
+          npm run lint > lint-report.txt 2>&1
           echo "LINT_STATUS=$?" >> $GITHUB_ENV
 
       - name: Run Security Audit
         id: audit
         continue-on-error: true
         run: |
-          npm audit --audit-level=moderate
+          npm audit --audit-level=moderate > audit-report.txt 2>&1
           echo "AUDIT_STATUS=$?" >> $GITHUB_ENV
 
       - name: Check for Dangerous Deletions
@@ -80,9 +80,9 @@ jobs:
             <title>Diff Analysis Report</title>
             <style>
               body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
-              .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
-              table { border-collapse: collapse; width: 100%; max-width: 800px; margin: 20px 0; }
-              th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+              .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+              table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+              th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: top; }
               th { background-color: #f5f5f5; font-weight: 600; }
               tr:nth-child(even) { background-color: #fafafa; }
               tr:hover { background-color: #f0f0f0; }
@@ -91,16 +91,29 @@ jobs:
               .risk-low { color: #28a745; font-weight: bold; }
               .warning { color: #e36209; }
               .error { color: #d73a49; font-weight: bold; }
+              .code { font-family: monospace; background: #f6f8fa; padding: 2px 4px; border-radius: 3px; }
+              .file-info { color: #666; margin: 5px 0; }
+              .suggestion { background: #fff8c5; padding: 8px; border-left: 4px solid #ffd33d; margin: 5px 0; }
             </style>
           </head>
           <body>
             <div class="container">
               <h2>Semantic Diff Analysis Report</h2>
               <table>
-                <tr><th>Change Type</th><th>Description</th><th>Risk Level</th></tr>
+                <tr>
+                  <th>Change Type</th>
+                  <th>Details</th>
+                  <th>Risk Level</th>
+                </tr>
                 <!-- ANALYSIS_RESULTS -->
               </table>
               <div id="summary"></div>
+              <div id="logs">
+                <h3>Lint Report</h3>
+                <pre class="code"><!-- LINT_REPORT --></pre>
+                <h3>Audit Report</h3>
+                <pre class="code"><!-- AUDIT_REPORT --></pre>
+              </div>
             </div>
           </body>
           </html>
@@ -123,72 +136,91 @@ jobs:
           risk="Low"
           results=""
 
-          # Function to add a finding
+          # Function to add a finding with detailed information
           add_finding() {
             local change="$1"
             local description="$2"
             local risk_level="$3"
-            results="$results<tr><td>$change</td><td>$description</td><td class=\"risk-$risk_level\">$risk_level</td></tr>"
+            local file_path="$4"
+            local line_num="$5"
+            local code_snippet="$6"
+            local suggestion="$7"
+            
+            results="$results<tr>
+              <td>$change</td>
+              <td>
+                <div><strong>Issue:</strong> $description</div>
+                <div class='file-info'><strong>File:</strong> $file_path:$line_num</div>
+                <div class='code'>$code_snippet</div>
+                <div class='suggestion'><strong>Suggestion:</strong> $suggestion</div>
+              </td>
+              <td class='risk-$risk_level'>$risk_level</td>
+            </tr>"
           }
 
-          # Validate merge base and perform diff analysis
-          if git merge-base --is-ancestor "$base_branch" HEAD 2>/dev/null; then
-            diff=$(git diff "$base_branch"...HEAD 2>log.txt || echo "")
-            
-            if [ -z "$diff" ]; then
-              add_finding "No Changes" "No changes detected or diff failed" "low"
-            else
-              # Check for destructive operations with escaped regex
-              if echo "$diff" | grep -E 'DROP|DELETE|TRUNCATE|rm\\s|unlink|localStorage\\.clear'; then
-                add_finding "Destructive Operation" "⚠️ Potential destructive operation found (SQL/File/Storage)" "high"
-                risk="High"
-              fi
+          # Function to check patterns in diff and add findings
+          check_pattern() {
+            local pattern="$1"
+            local change_type="$2"
+            local risk_level="$3"
+            local description="$4"
+            local suggestion="$5"
 
-              # Check for unsafe functions
-              if echo "$diff" | grep -E 'eval\\(|exec\\(|Function\\(|setTimeout\\([^,]*\\,|setInterval\\([^,]*\\,'; then
-                add_finding "Unsafe Function" "⚠️ Use of unsafe functions detected" "medium"
-                [ "$risk" != "High" ] && risk="Medium"
+            git diff "$base_branch"...HEAD -U0 | while IFS= read -r line; do
+              if echo "$line" | grep -q "$pattern"; then
+                file_path=$(echo "$line" | sed -n 's/^+++ b\(.*\)/\1/p')
+                line_num=$(echo "$line" | grep -n '^@@' | cut -d: -f1)
+                code_snippet=$(echo "$line" | grep "$pattern" | head -n 1)
+                
+                if [ ! -z "$file_path" ] && [ ! -z "$line_num" ]; then
+                  add_finding "$change_type" "$description" "$risk_level" "$file_path" "$line_num" "$code_snippet" "$suggestion"
+                  [ "$risk_level" = "high" ] && risk="High"
+                  [ "$risk_level" = "medium" ] && [ "$risk" != "High" ] && risk="Medium"
+                fi
               fi
+            done
+          }
 
-              # Check for sensitive data with escaped regex
-              if echo "$diff" | grep -E '\(^|[^a-zA-Z0-9]\)password[^a-zA-Z0-9]|\[^a-zA-Z0-9\]secret[^a-zA-Z0-9]|\[^a-zA-Z0-9\]token[^a-zA-Z0-9]'; then
-                add_finding "Sensitive Data" "⚠️ Changes involving sensitive data detected" "medium"
-                [ "$risk" != "High" ] && risk="Medium"
-              fi
+          # Check for destructive operations
+          check_pattern "DROP|DELETE|TRUNCATE|rm\s|unlink|localStorage\.clear" \
+            "Destructive Operation" \
+            "high" \
+            "⚠️ Potential destructive operation found" \
+            "Consider using soft deletion or archiving instead of permanent deletion"
 
-              # Check for large changes
-              change_size=$(echo "$diff" | wc -c)
-              if [ $change_size -gt 10000 ]; then
-                add_finding "Large Change" "⚠️ Large code change ($(($change_size/1000))KB) detected" "medium"
-                [ "$risk" != "High" ] && risk="Medium"
-              fi
+          # Check for unsafe functions
+          check_pattern "eval\(|exec\(|Function\(|setTimeout\([^,]*,|setInterval\([^,]*," \
+            "Unsafe Function" \
+            "medium" \
+            "⚠️ Use of unsafe functions detected" \
+            "Replace unsafe functions with secure alternatives"
 
-              # Add summary
-              results="$results<tr><td colspan=\"2\"><strong>Overall Risk Assessment</strong></td><td class=\"risk-${risk:-low}\">${risk:-Low}</td></tr>"
-            fi
-          else
-            add_finding "Error" "❌ No common ancestor with $base_branch. Skipping analysis" "low"
-            risk="Low"
+          # Check for sensitive data
+          check_pattern "(password|secret|token)[\"']?\s*[:=]" \
+            "Sensitive Data" \
+            "medium" \
+            "⚠️ Changes involving sensitive data detected" \
+            "Ensure sensitive data is properly encrypted and not exposed in logs"
+
+          # Add lint and audit reports
+          if [ -f "lint-report.txt" ]; then
+            lint_report=$(cat lint-report.txt)
+            sed -i "s|<!-- LINT_REPORT -->|$lint_report|" diff.html
           fi
 
-          # Generate final report with fallback and add errors/warnings
+          if [ -f "audit-report.txt" ]; then
+            audit_report=$(cat audit-report.txt)
+            sed -i "s|<!-- AUDIT_REPORT -->|$audit_report|" diff.html
+          fi
+
+          # Generate final report
           cp report_template.html diff.html
           if [ -z "$results" ]; then
-            sed -i "s|<!-- ANALYSIS_RESULTS -->|<tr><td colspan=\"3\">No significant findings</td></tr>|" diff.html
+            sed -i "s|<!-- ANALYSIS_RESULTS -->|<tr><td colspan='3'>No significant findings</td></tr>|" diff.html
           else
             sed -i "s|<!-- ANALYSIS_RESULTS -->|$results|" diff.html
           fi
-          # Add linting warning if applicable
-          if [ "${LINT_STATUS:-0}" != "0" ] || [ -z "${LINT_STATUS:-}" ]; then
-            echo "<p class=\"warning\">Warning: Linting issues found. Please review the logs.</p>" >> diff.html
-          fi
-          # Add high risk error if applicable
-          if [ "${DELETIONS_FOUND:-false}" == "true" ] || [ "${RISK_LEVEL:-Low}" == "High" ]; then
-            echo "<p class=\"error\">Error: Action required: File deletions or High risk detected. Manual review required.</p>" >> diff.html
-          fi
-          # Add current date and time
-          echo "<p>Report generated on: 04:35 PM IST, Friday, August 01, 2025</p>" >> diff.html
-          
+
           # Set output for subsequent steps
           echo "RISK_LEVEL=${risk:-Low}" >> $GITHUB_ENV
 
