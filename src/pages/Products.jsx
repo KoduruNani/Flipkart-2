@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getProducts, getProductCategories } from '../services/productService';
 import './Products.css';
 
@@ -9,40 +9,86 @@ const Products = () => {
   const [error, setError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('default');
 
-  useEffect(() => {
-    fetchProducts();
-    fetchCategories();
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [productsData, categoriesData] = await Promise.all([
+        getProducts(),
+        getProductCategories()
+      ]);
+
+      setProducts(productsData);
+      setCategories(categoriesData);
+    } catch (err) {
+      setError('Failed to load products. Please try again later.');
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const fetchProducts = async () => {
-    try {
-      const data = await getProducts();
-      setProducts(data);
-      setLoading(false);
-    } catch (error) {
-      setError('Failed to fetch products');
-      setLoading(false);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const filteredAndSortedProducts = useMemo(() => {
+    let result = products;
+
+    // Apply category filter
+    if (selectedCategory !== 'all') {
+      result = result.filter(product => product.category === selectedCategory);
     }
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(product =>
+        product.title.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'price-asc':
+        return [...result].sort((a, b) => a.price - b.price);
+      case 'price-desc':
+        return [...result].sort((a, b) => b.price - a.price);
+      case 'name-asc':
+        return [...result].sort((a, b) => a.title.localeCompare(b.title));
+      case 'name-desc':
+        return [...result].sort((a, b) => b.title.localeCompare(a.title));
+      default:
+        return result;
+    }
+  }, [products, selectedCategory, searchQuery, sortBy]);
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
   };
 
-  const fetchCategories = async () => {
-    try {
-      const data = await getProductCategories();
-      setCategories(data);
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-    }
+  const handleCategoryChange = (e) => {
+    setSelectedCategory(e.target.value);
   };
 
-  const filteredProducts = products
-    .filter(product => 
-      selectedCategory === 'all' || product.category === selectedCategory)
-    .filter(product =>
-      product.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const handleSortChange = (e) => {
+    setSortBy(e.target.value);
+  };
 
-  if (loading) return <div className="loading">Loading products...</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (error) {
+    return (
+      <div className="error-container">
+        <p className="error-message">{error}</p>
+        <button onClick={fetchData} className="retry-button">
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="products-container">
@@ -51,13 +97,16 @@ const Products = () => {
           type="text"
           placeholder="Search products..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={handleSearchChange}
           className="search-input"
+          aria-label="Search products"
         />
+        
         <select
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
+          onChange={handleCategoryChange}
           className="category-select"
+          aria-label="Filter by category"
         >
           <option value="all">All Categories</option>
           {categories.map(category => (
@@ -66,23 +115,60 @@ const Products = () => {
             </option>
           ))}
         </select>
+
+        <select
+          value={sortBy}
+          onChange={handleSortChange}
+          className="sort-select"
+          aria-label="Sort products"
+        >
+          <option value="default">Default Sort</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="name-asc">Name: A to Z</option>
+          <option value="name-desc">Name: Z to A</option>
+        </select>
       </div>
 
-      <div className="products-grid">
-        {filteredProducts.map(product => (
-          <div key={product.id} className="product-card">
-            <div className="product-image-container">
-              <img src={product.image} alt={product.title} className="product-image" />
+      {loading ? (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading products...</p>
+        </div>
+      ) : filteredAndSortedProducts.length === 0 ? (
+        <div className="no-results">
+          <p>No products found. Try adjusting your filters.</p>
+        </div>
+      ) : (
+        <div className="products-grid">
+          {filteredAndSortedProducts.map(product => (
+            <div key={product.id} className="product-card">
+              <div className="product-image-container">
+                <img 
+                  src={product.image} 
+                  alt={product.title}
+                  className="product-image"
+                  loading="lazy"
+                />
+              </div>
+              <div className="product-info">
+                <h3 className="product-title">{product.title}</h3>
+                <p className="product-category">{product.category}</p>
+                <p className="product-price">${product.price.toFixed(2)}</p>
+                <button 
+                  className="add-to-cart-btn"
+                  onClick={() => {
+                    // TODO: Implement add to cart functionality
+                    console.log('Add to cart:', product.id);
+                  }}
+                >
+                  Add to Cart
+                </button>
+              </div>
             </div>
-            <div className="product-info">
-              <h3 className="product-title">{product.title}</h3>
-              <p className="product-category">{product.category}</p>
-              <p className="product-price">${product.price}</p>
-              <button className="add-to-cart-btn">Add to Cart</button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

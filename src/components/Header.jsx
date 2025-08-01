@@ -1,13 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { searchProducts } from '../services/productService';
 import './Header.css';
 
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-
   const [searchResults, setSearchResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
+  const resultsRef = useRef(null);
+
+  useEffect(() => {
+    // Close search results when clicking outside
+    const handleClickOutside = (event) => {
+      if (resultsRef.current && !resultsRef.current.contains(event.target)) {
+        setShowResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSearch = async (e) => {
     if (e) {
@@ -29,6 +42,17 @@ const Header = () => {
       setIsSearching(false);
     }
   };
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.trim()) {
+        handleSearch();
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   return (
     <header className="header">
@@ -60,7 +84,7 @@ const Header = () => {
         </div>
 
         <div className="header__search">
-          <div className="header__search-container">
+          <div className="header__search-container" ref={resultsRef}>
             <form onSubmit={handleSearch} role="search">
               <input 
                 type="search" 
@@ -73,10 +97,9 @@ const Header = () => {
               />
               <button 
                 className="header__search-button"
-                onClick={handleSearch}
+                type="submit"
                 disabled={isSearching}
                 aria-label="Search"
-                type="submit"
               >
                 <svg width="20" height="20" viewBox="0 0 17 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <g fill="#2874F1" fillRule="evenodd">
@@ -86,6 +109,30 @@ const Header = () => {
                 </svg>
               </button>
             </form>
+            {showResults && (
+              <div className="header__search-results">
+                {isSearching ? (
+                  <div className="header__search-loading">Searching...</div>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((product) => (
+                    <Link
+                      key={product.id}
+                      to={`/products/${product.id}`}
+                      className="header__search-result-item"
+                      onClick={() => setShowResults(false)}
+                    >
+                      <img src={product.image} alt={product.title} className="header__search-result-image" />
+                      <div className="header__search-result-info">
+                        <h4>{product.title}</h4>
+                        <p>${product.price}</p>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="header__search-no-results">No products found</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
