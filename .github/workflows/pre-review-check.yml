@@ -125,6 +125,9 @@ jobs:
           echo "=== Running Semantic Diff Analysis ==="
           base_branch="${{ github.base_ref }}"
 
+          # Create temporary directory for reports
+          mkdir -p ./reports
+
           # Ensure complete history is available
           git fetch --no-tags --prune --unshallow 2>/dev/null || echo "::warning::Unable to fetch full history"
           git fetch origin "$base_branch:$base_branch" 2>log.txt || { 
@@ -132,9 +135,10 @@ jobs:
             exit 1
           }
 
-          # Initialize risk level
+          # Initialize risk level and results file
           risk="Low"
-          results=""
+          results_file="./reports/results.html"
+          echo "" > "$results_file"
 
           # Function to add a finding with detailed information
           add_finding() {
@@ -146,16 +150,24 @@ jobs:
             local code_snippet="$6"
             local suggestion="$7"
             
-            results="$results<tr>
-              <td>$change</td>
+            printf "<tr>
+              <td>%s</td>
               <td>
-                <div><strong>Issue:</strong> $description</div>
-                <div class='file-info'><strong>File:</strong> $file_path:$line_num</div>
-                <div class='code'>$code_snippet</div>
-                <div class='suggestion'><strong>Suggestion:</strong> $suggestion</div>
+                <div><strong>Issue:</strong> %s</div>
+                <div class='file-info'><strong>File:</strong> %s:%s</div>
+                <div class='code'>%s</div>
+                <div class='suggestion'><strong>Suggestion:</strong> %s</div>
               </td>
-              <td class='risk-$risk_level'>$risk_level</td>
-            </tr>"
+              <td class='risk-%s'>%s</td>
+            </tr>\n" \
+              "$change" \
+              "$description" \
+              "$file_path" \
+              "$line_num" \
+              "$code_snippet" \
+              "$suggestion" \
+              "$risk_level" \
+              "$risk_level" >> "$results_file"
           }
 
           # Function to check patterns in diff and add findings
@@ -205,21 +217,32 @@ jobs:
           # Add lint and audit reports
           if [ -f "lint-report.txt" ]; then
             lint_report=$(cat lint-report.txt)
-            sed -i "s|<!-- LINT_REPORT -->|$lint_report|" diff.html
+            awk -v report="$lint_report" '
+              /<!-- LINT_REPORT -->/ { print report; next }
+              { print }
+            ' diff.html > diff.tmp && mv diff.tmp diff.html
           fi
 
           if [ -f "audit-report.txt" ]; then
             audit_report=$(cat audit-report.txt)
-            sed -i "s|<!-- AUDIT_REPORT -->|$audit_report|" diff.html
+            awk -v report="$audit_report" '
+              /<!-- AUDIT_REPORT -->/ { print report; next }
+              { print }
+            ' diff.html > diff.tmp && mv diff.tmp diff.html
           fi
 
           # Generate final report
           cp report_template.html diff.html
-          if [ -z "$results" ]; then
-            sed -i "s|<!-- ANALYSIS_RESULTS -->|<tr><td colspan='3'>No significant findings</td></tr>|" diff.html
-          else
-            sed -i "s|<!-- ANALYSIS_RESULTS -->|$results|" diff.html
+          if [ ! -s "$results_file" ]; then
+            echo "<tr><td colspan='3'>No significant findings</td></tr>" > "$results_file"
           fi
+          
+          # Replace placeholders in the template
+          results_content=$(cat "$results_file")
+          awk -v results="$results_content" '
+            /<!-- ANALYSIS_RESULTS -->/ { print results; next }
+            { print }
+          ' report_template.html > diff.html
 
           # Set output for subsequent steps
           echo "RISK_LEVEL=${risk:-Low}" >> $GITHUB_ENV
