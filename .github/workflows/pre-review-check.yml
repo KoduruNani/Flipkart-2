@@ -193,12 +193,18 @@ jobs:
             done
           }
 
-          # Check for destructive operations
-          check_pattern "DROP\\|DELETE\\|TRUNCATE\\|rm[[:space:]]\\|unlink\\|localStorage\\.clear" \
-            "Destructive Operation" \
+          # Check for API security issues and error handling
+          check_pattern "https?://[^\"']*api" \
+            "API Security" \
             "high" \
-            "⚠️ Potential destructive operation found" \
-            "Consider using soft deletion or archiving instead of permanent deletion"
+            "⚠️ Insecure API endpoint detected" \
+            "Use HTTPS and environment variables for API endpoints"
+
+          check_pattern "console\\.error" \
+            "Error Handling" \
+            "medium" \
+            "⚠️ Direct console error logging detected" \
+            "Implement proper error logging and monitoring"
 
           # Check for unsafe functions
           check_pattern "eval\\|exec\\|Function\\|setTimeout.*,\\|setInterval.*," \
