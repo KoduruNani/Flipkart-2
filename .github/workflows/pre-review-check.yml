@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20.19.0'  # Updated to a supported version
           cache: 'npm'
 
       - name: Install Node Dependencies
@@ -138,20 +138,20 @@ jobs:
             if [ -z "$diff" ]; then
               add_finding "No Changes" "No changes detected or diff failed" "low"
             else
-              # Check for destructive operations
+              # Check for destructive operations with escaped regex
               if echo "$diff" | grep -E 'DROP|DELETE|TRUNCATE|rm\\s|unlink|localStorage\\.clear'; then
                 add_finding "Destructive Operation" "⚠️ Potential destructive operation found (SQL/File/Storage)" "high"
                 risk="High"
               fi
 
               # Check for unsafe functions
-              if echo "$diff" | grep -E 'eval\\(|exec\\(|Function\\(|setTimeout\\([^,]*,|setInterval\\([^,]*,'; then
+              if echo "$diff" | grep -E 'eval\\(|exec\\(|Function\\(|setTimeout\\([^,]*\\,|setInterval\\([^,]*\\,'; then
                 add_finding "Unsafe Function" "⚠️ Use of unsafe functions detected" "medium"
                 [ "$risk" != "High" ] && risk="Medium"
               fi
 
-              # Check for sensitive data (refined regex)
-              if echo "$diff" | grep -E '(^|[^a-zA-Z0-9])password[^a-zA-Z0-9]|[^a-zA-Z0-9]secret[^a-zA-Z0-9]|[^a-zA-Z0-9]token[^a-zA-Z0-9]'; then
+              # Check for sensitive data with escaped regex
+              if echo "$diff" | grep -E '\(^|[^a-zA-Z0-9]\)password[^a-zA-Z0-9]|\[^a-zA-Z0-9\]secret[^a-zA-Z0-9]|\[^a-zA-Z0-9\]token[^a-zA-Z0-9]'; then
                 add_finding "Sensitive Data" "⚠️ Changes involving sensitive data detected" "medium"
                 [ "$risk" != "High" ] && risk="Medium"
               fi
@@ -187,7 +187,7 @@ jobs:
             echo "<p class=\"error\">Error: Action required: File deletions or High risk detected. Manual review required.</p>" >> diff.html
           fi
           # Add current date and time
-          echo "<p>Report generated on: 03:38 PM IST, Thursday, July 31, 2025</p>" >> diff.html
+          echo "<p>Report generated on: 04:35 PM IST, Friday, August 01, 2025</p>" >> diff.html
           
           # Set output for subsequent steps
           echo "RISK_LEVEL=${risk:-Low}" >> $GITHUB_ENV
