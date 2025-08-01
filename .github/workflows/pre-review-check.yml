@@ -167,10 +167,10 @@ jobs:
             local suggestion="$5"
 
             git diff "$base_branch"...HEAD -U0 | while IFS= read -r line; do
-              if echo "$line" | grep -q "$pattern"; then
+              if echo "$line" | grep -E "$pattern" >/dev/null 2>&1; then
                 file_path=$(echo "$line" | sed -n 's/^+++ b\(.*\)/\1/p')
                 line_num=$(echo "$line" | grep -n '^@@' | cut -d: -f1)
-                code_snippet=$(echo "$line" | grep "$pattern" | head -n 1)
+                code_snippet=$(echo "$line" | grep -E "$pattern" | head -n 1)
                 
                 if [ ! -z "$file_path" ] && [ ! -z "$line_num" ]; then
                   add_finding "$change_type" "$description" "$risk_level" "$file_path" "$line_num" "$code_snippet" "$suggestion"
@@ -182,21 +182,21 @@ jobs:
           }
 
           # Check for destructive operations
-          check_pattern "DROP|DELETE|TRUNCATE|rm\s|unlink|localStorage\.clear" \
+          check_pattern "DROP\\|DELETE\\|TRUNCATE\\|rm[[:space:]]\\|unlink\\|localStorage\\.clear" \
             "Destructive Operation" \
             "high" \
             "⚠️ Potential destructive operation found" \
             "Consider using soft deletion or archiving instead of permanent deletion"
 
           # Check for unsafe functions
-          check_pattern "eval\(|exec\(|Function\(|setTimeout\([^,]*,|setInterval\([^,]*," \
+          check_pattern "eval\\|exec\\|Function\\|setTimeout.*,\\|setInterval.*," \
             "Unsafe Function" \
             "medium" \
             "⚠️ Use of unsafe functions detected" \
             "Replace unsafe functions with secure alternatives"
 
           # Check for sensitive data
-          check_pattern "(password|secret|token)[\"']?\s*[:=]" \
+          check_pattern "\\(password\\|secret\\|token\\)[\"']?[[:space:]]*[:=]" \
             "Sensitive Data" \
             "medium" \
             "⚠️ Changes involving sensitive data detected" \
