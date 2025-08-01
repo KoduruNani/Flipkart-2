@@ -202,14 +202,14 @@ jobs:
       - name: Check Results
         if: always()
         run: |
-          if [ "${{ env.LINT_STATUS }}" != "0" ] || [ -z "${{ env.LINT_STATUS }}" ]; then
+          if [ "${{ env.LINT_STATUS }}" != "0" ] && [ ! -z "${{ env.LINT_STATUS }}" ]; then
             echo "::warning::Linting issues found. Please review the logs."
           fi
-          if [ "${{ env.AUDIT_STATUS }}" != "0" ]; then
+          if [ "${{ env.AUDIT_STATUS }}" != "0" ] && [ ! -z "${{ env.AUDIT_STATUS }}" ]; then
             echo "::warning::Security vulnerabilities detected. Please review the audit report."
           fi
           # Check for critical conditions
-          if [ "${{ env.DELETIONS_FOUND }}" == "true" ] || [ "${{ env.RISK_LEVEL }}" == "High" ]; then
+          if [ "${{ env.DELETIONS_FOUND }}" == "true" ] && [ "${{ env.RISK_LEVEL }}" == "High" ]; then
             echo "::error::Action required: File deletions or High risk detected. Manual review required."
             exit 1
           fi
