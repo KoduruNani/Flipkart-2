@@ -93,12 +93,12 @@ def parse_audit():
     except Exception:
         return []
 
-def generate_html(findings, lint_issues, audit_issues):
+def generate_html(findings, lint_issues, audit_issues, raw_diff, raw_lint, raw_audit):
     now = datetime.now().strftime('%I:%M %p IST, %A, %B %d, %Y')
     html = [
         "<!DOCTYPE html>",
         "<html lang='en'><head><meta charset='UTF-8'><title>Semantic Diff Analysis Report</title>",
-        "<style>body{font-family:sans-serif;}table{border-collapse:collapse;width:100%;margin:20px 0;}th,td{border:1px solid #ddd;padding:12px;}th{background:#f5f5f5;}tr:nth-child(even){background:#fafafa;}tr:hover{background:#f0f0f0;}h2{margin-top:2em;} .risk-high{color:#d73a49;font-weight:bold;} .risk-medium{color:#e36209;font-weight:bold;} .risk-low{color:#28a745;font-weight:bold;}</style></head><body>",
+        "<style>body{font-family:sans-serif;}table{border-collapse:collapse;width:100%;margin:20px 0;}th,td{border:1px solid #ddd;padding:12px;}th{background:#f5f5f5;}tr:nth-child(even){background:#fafafa;}tr:hover{background:#f0f0f0;}h2{margin-top:2em;} .risk-high{color:#d73a49;font-weight:bold;} .risk-medium{color:#e36209;font-weight:bold;} .risk-low{color:#28a745;font-weight:bold;} pre{background:#f5f5f5;padding:10px;overflow:auto;}</style></head><body>",
         f"<h1>Semantic Diff Analysis Report</h1>",
         "<table><tr><th>Change Type</th><th>Details</th><th>Risk Level</th></tr>"
     ]
@@ -123,6 +123,10 @@ def generate_html(findings, lint_issues, audit_issues):
         html.append("<tr><td colspan='4'>No audit issues</td></tr>")
     html.append("</table>")
     html.append(f"<p>Report generated on: {now}</p>")
+    # Debug section
+    html.append("<h2>Debug: Raw Diff</h2><pre>" + (raw_diff if raw_diff else 'No diff detected') + "</pre>")
+    html.append("<h2>Debug: Raw Lint Output</h2><pre>" + (raw_lint if raw_lint else 'No lint-output.json found') + "</pre>")
+    html.append("<h2>Debug: Raw Audit Output</h2><pre>" + (raw_audit if raw_audit else 'No audit-output.json found') + "</pre>")
     html.append("</body></html>")
     return '\n'.join(html)
 
@@ -131,7 +135,15 @@ if __name__ == "__main__":
     findings = parse_diff(diff) if diff else []
     lint_issues = parse_lint()
     audit_issues = parse_audit()
-    html = generate_html(findings, lint_issues, audit_issues)
+    raw_lint = ''
+    raw_audit = ''
+    if os.path.exists("lint-output.json"):
+        with open("lint-output.json", encoding="utf-8") as f:
+            raw_lint = f.read()
+    if os.path.exists("audit-output.json"):
+        with open("audit-output.json", encoding="utf-8") as f:
+            raw_audit = f.read()
+    html = generate_html(findings, lint_issues, audit_issues, diff, raw_lint, raw_audit)
     with open("diff.html", "w", encoding="utf-8") as f:
         f.write(html)
     print("Analysis complete. Check diff.html for details.")
