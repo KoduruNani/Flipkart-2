@@ -75,6 +75,16 @@ jobs:
             echo "DELETIONS_FOUND=false" >> $GITHUB_ENV
           fi
 
+      - name: Fetch all history and base branch
+        run: |
+          git fetch --prune --unshallow || echo "::warning::Failed to fetch full history"
+          git fetch origin ${{ github.base_ref }}:${{ github.base_ref }} || echo "::warning::Failed to fetch base branch"
+
+      - name: Print git diff for debug
+        run: |
+          echo "=== Git Diff Debug ==="
+          git diff origin/${{ github.base_ref }}...HEAD || echo "::warning::No diff detected"
+
       - name: Run Semantic Diff Analysis
         id: diff-analysis
         run: |
@@ -87,14 +97,11 @@ jobs:
             echo "RISK_LEVEL=Low" >> $GITHUB_ENV
           fi
 
-      - name: Upload Analysis Report
+      - name: Upload Diff for Review
         uses: actions/upload-artifact@v4
         with:
-          name: code-analysis-report
-          path: |
-            diff.html
-            lint-output.json
-            audit-output.json
+          name: code-diff-analysis
+          path: diff.html
           retention-days: 7
 
       - name: Comment PR with Analysis Results
