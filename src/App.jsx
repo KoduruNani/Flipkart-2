@@ -4,11 +4,12 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Products from './pages/Products';
 import Header from './components/Header';
+import Footer from './components/Footer';
 import './App.css';
 
 function App() {
   return (
-    <>
+    <div className="app-container">
       <Header />
       <main>
         <Routes>
@@ -18,7 +19,8 @@ function App() {
           <Route path="/register" element={<Register />} />
         </Routes>
       </main>
-    </>
+      <Footer />
+    </div>
   );
 }
 
