@@ -112,10 +112,10 @@ jobs:
             const fs = require('fs');
             const summary = `## Code Analysis Summary
 
-- Risk Level: ${{ env.RISK_LEVEL }}
-- Linting Status: ${{ env.LINT_STATUS == '0' && '✅ Pass' || '⚠️ Issues Found' }}
-- Security Audit: ${{ env.AUDIT_STATUS == '0' && '✅ Pass' || '⚠️ Issues Found' }}
-- File Deletions: ${{ env.DELETIONS_FOUND == 'true' && '⚠️ Yes' || '✅ No' }}
+- Risk Level: ${process.env.RISK_LEVEL}
+- Linting Status: ${process.env.LINT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
+- Security Audit: ${process.env.AUDIT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
+- File Deletions: ${process.env.DELETIONS_FOUND === 'true' ? '⚠️ Yes' : '✅ No'}
 
 [View Full Report](${context.payload.repository.html_url}/actions/runs/${context.runId}/artifacts)`;
 
