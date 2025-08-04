@@ -193,8 +193,11 @@ export const updateProduct = async (id, productData) => {
 export const deleteProduct = async (id) => {
   if (!id) throw new APIError('Product ID is required', 400);
 
+  // Instead of hard delete, mark as deleted (soft delete)
   const response = await apiCall(`/products/${id}`, {
-    method: 'DELETE',
+    method: 'PATCH',
+    body: JSON.stringify({ deleted: true }),
+    headers: { 'Content-Type': 'application/json' },
   });
 
   // Invalidate cache
