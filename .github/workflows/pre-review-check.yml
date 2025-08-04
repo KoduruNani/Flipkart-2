@@ -31,12 +31,12 @@ jobs:
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pygit2
+          pip install pygit2 gitpython
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20.19.0'  # Updated to supported version
           cache: 'npm'
 
       - name: Install Node Dependencies
@@ -47,14 +47,14 @@ jobs:
         id: lint
         continue-on-error: true
         run: |
-          npm run lint > lint-report.txt 2>&1
+          npm run lint -- --format json > lint-output.json 2>/dev/null || true
           echo "LINT_STATUS=$?" >> $GITHUB_ENV
 
       - name: Run Security Audit
         id: audit
         continue-on-error: true
         run: |
-          npm audit --audit-level=moderate > audit-report.txt 2>&1
+          npm audit --json > audit-output.json 2>/dev/null || true
           echo "AUDIT_STATUS=$?" >> $GITHUB_ENV
 
       - name: Check for Dangerous Deletions
@@ -70,188 +70,171 @@ jobs:
             echo "DELETIONS_FOUND=false" >> $GITHUB_ENV
           fi
 
-      - name: Create Report Template
+      - name: Fetch all history and base branch
         run: |
-          cat << 'EOF' > report_template.html
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <title>Diff Analysis Report</title>
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
-              .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-              table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-              th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: top; }
-              th { background-color: #f5f5f5; font-weight: 600; }
-              tr:nth-child(even) { background-color: #fafafa; }
-              tr:hover { background-color: #f0f0f0; }
-              .risk-high { color: #d73a49; font-weight: bold; }
-              .risk-medium { color: #e36209; font-weight: bold; }
-              .risk-low { color: #28a745; font-weight: bold; }
-              .warning { color: #e36209; }
-              .error { color: #d73a49; font-weight: bold; }
-              .code { font-family: monospace; background: #f6f8fa; padding: 2px 4px; border-radius: 3px; }
-              .file-info { color: #666; margin: 5px 0; }
-              .suggestion { background: #fff8c5; padding: 8px; border-left: 4px solid #ffd33d; margin: 5px 0; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h2>Semantic Diff Analysis Report</h2>
-              <table>
-                <tr>
-                  <th>Change Type</th>
-                  <th>Details</th>
-                  <th>Risk Level</th>
-                </tr>
-                <!-- ANALYSIS_RESULTS -->
-              </table>
-              <div id="summary"></div>
-              <div id="logs">
-                <h3>Lint Report</h3>
-                <pre class="code"><!-- LINT_REPORT --></pre>
-                <h3>Audit Report</h3>
-                <pre class="code"><!-- AUDIT_REPORT --></pre>
-              </div>
-            </div>
-          </body>
-          </html>
-          EOF
+          git fetch --prune --unshallow || echo "::warning::Failed to fetch full history"
+          git fetch origin ${{ github.base_ref }}:${{ github.base_ref }} || echo "::warning::Failed to fetch base branch"
 
-      - name: Semantic Diff Analysis
+      - name: Print git diff for debug
+        run: |
+          echo "=== Git Diff Debug ==="
+          git diff origin/${{ github.base_ref }}...HEAD || echo "::warning::No diff detected"
+
+      - name: Create scripts directory and copy analyze_diff.py
+        run: |
+          mkdir -p scripts
+          cat > scripts/analyze_diff.py << 'EOF'
+import subprocess
+import os
+import json
+import re
+from datetime import datetime
+
+def get_git_diff():
+    base_branch = os.getenv("GITHUB_BASE_REF", "main")
+    diff = subprocess.run(
+        ["git", "diff", f"origin/{base_branch}...HEAD", "--unified=3"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    return diff.stdout if diff.returncode == 0 else ""
+
+def parse_diff(diff_text):
+    findings = []
+    current_file = None
+    current_line = 0
+    for line in diff_text.splitlines():
+        if line.startswith("+++ b/"):
+            current_file = line[6:]
+        elif line.startswith("@@"):
+            m = re.match(r"@@ -\d+,\d+ \+(\d+),", line)
+            if m:
+                current_line = int(m.group(1))
+        elif line.startswith("+") and not line.startswith("+++ "):
+            content = line[1:]
+            change_type = None
+            risk = "Low"
+            desc = ""
+            if re.search(r"DROP|DELETE|TRUNCATE|rm |unlink|localStorage\.clear", content):
+                change_type = "Destructive Operation"
+                desc = "Potential destructive operation found (SQL/File/Storage)."
+                risk = "High"
+            elif re.search(r"eval\(|exec\(|Function\(", content):
+                change_type = "Unsafe Function"
+                desc = "Use of unsafe functions detected."
+                risk = "Medium"
+            elif re.search(r"password|secret|token|api_key|private_key", content, re.IGNORECASE):
+                change_type = "Sensitive Data"
+                desc = "Sensitive data found in code."
+                risk = "Medium"
+            if change_type:
+                findings.append({
+                    "file": current_file or "-",
+                    "line": current_line,
+                    "change_type": change_type,
+                    "description": desc,
+                    "risk_level": risk,
+                    "suggestion": "Review or remove this change."
+                })
+            current_line += 1
+    return findings
+
+def parse_lint():
+    if not os.path.exists("lint-output.json"):
+        return []
+    try:
+        with open("lint-output.json", encoding="utf-8") as f:
+            data = json.load(f)
+        issues = []
+        for file_result in data:
+            file_path = file_result.get("filePath", "-").replace("/github/workspace/", "")
+            for msg in file_result.get("messages", []):
+                issues.append({
+                    "file": file_path,
+                    "line": msg.get("line", "-"),
+                    "message": msg.get("message", "-"),
+                    "rule": msg.get("ruleId", "-")
+                })
+        return issues
+    except Exception:
+        return []
+
+def parse_audit():
+    if not os.path.exists("audit-output.json"):
+        return []
+    try:
+        with open("audit-output.json", encoding="utf-8") as f:
+            data = json.load(f)
+        issues = []
+        advisories = data.get("advisories", {})
+        for adv in advisories.values():
+            issues.append({
+                "package": adv.get("module_name", "-"),
+                "vulnerability": adv.get("title", "-"),
+                "severity": adv.get("severity", "-"),
+                "recommendation": adv.get("recommendation", "-")
+            })
+        return issues
+    except Exception:
+        return []
+
+def generate_html(findings, lint_issues, audit_issues, raw_diff):
+    now = datetime.now().strftime('%I:%M %p IST, %A, %B %d, %Y')
+    html = [
+        "<!DOCTYPE html>",
+        "<html lang='en'><head><meta charset='UTF-8'><title>Semantic Diff Analysis Report</title>",
+        "<style>body{font-family:sans-serif;}table{border-collapse:collapse;width:100%;margin:20px 0;}th,td{border:1px solid #ddd;padding:12px;}th{background:#f5f5f5;}tr:nth-child(even){background:#fafafa;}tr:hover{background:#f0f0f0;}h2{margin-top:2em;} .risk-high{color:#d73a49;font-weight:bold;} .risk-medium{color:#e36209;font-weight:bold;} .risk-low{color:#28a745;font-weight:bold;} pre{background:#f5f5f5;padding:10px;overflow:auto;}</style></head><body>",
+        "<h1>Semantic Diff Analysis Report</h1>",
+        "<table><tr><th>Change Type</th><th>Details</th><th>Risk Level</th></tr>"
+    ]
+    if findings:
+        for f in findings:
+            html.append(f"<tr><td>{f['change_type']}</td><td>{f['file']} (line {f['line']}): {f['description']}</td><td class='risk-{f['risk_level'].lower()}'>{f['risk_level']}</td></tr>")
+    else:
+        html.append("<tr><td colspan='3'>No significant findings</td></tr>")
+    html.append("</table>")
+    html.append("<h2>Lint Report</h2><table><tr><th>File</th><th>Line</th><th>Message</th><th>Rule</th></tr>")
+    if lint_issues:
+        for l in lint_issues:
+            html.append(f"<tr><td>{l['file']}</td><td>{l['line']}</td><td>{l['message']}</td><td>{l['rule']}</td></tr>")
+    else:
+        html.append("<tr><td colspan='4'>No lint issues</td></tr>")
+    html.append("</table>")
+    html.append("<h2>Audit Report</h2><table><tr><th>Package</th><th>Vulnerability</th><th>Severity</th><th>Recommendation</th></tr>")
+    if audit_issues:
+        for a in audit_issues:
+            html.append(f"<tr><td>{a['package']}</td><td>{a['vulnerability']}</td><td>{a['severity']}</td><td>{a['recommendation']}</td></tr>")
+    else:
+        html.append("<tr><td colspan='4'>No audit issues</td></tr>")
+    html.append("</table>")
+    html.append(f"<p>Report generated on: {now}</p>")
+    html.append("<h2>Debug: Raw Diff</h2><pre>" + (raw_diff if raw_diff else 'No diff detected') + "</pre>")
+    html.append("</body></html>")
+    return '\n'.join(html)
+
+if __name__ == "__main__":
+    diff = get_git_diff()
+    findings = parse_diff(diff) if diff else []
+    lint_issues = parse_lint()
+    audit_issues = parse_audit()
+    html = generate_html(findings, lint_issues, audit_issues, diff)
+    with open("diff.html", "w", encoding="utf-8") as f:
+        f.write(html)
+    print("Analysis complete. Check diff.html for details.")
+          EOF
+          chmod +x scripts/analyze_diff.py
+
+      - name: Run Semantic Diff Analysis
         id: diff-analysis
         run: |
-          echo "=== Running Semantic Diff Analysis ==="
-          base_branch="${{ github.base_ref }}"
-
-          # Create temporary directory for reports
-          mkdir -p ./reports
-
-          # Ensure complete history is available
-          git fetch --no-tags --prune --unshallow 2>/dev/null || echo "::warning::Unable to fetch full history"
-          git fetch origin "$base_branch:$base_branch" 2>log.txt || { 
-            echo "::error::Failed to fetch $base_branch. Check log.txt for details"
-            exit 1
-          }
-
-          # Initialize risk level and results file
-          risk="Low"
-          results_file="./reports/results.html"
-          echo "" > "$results_file"
-
-          # Function to add a finding with detailed information
-          add_finding() {
-            local change="$1"
-            local description="$2"
-            local risk_level="$3"
-            local file_path="$4"
-            local line_num="$5"
-            local code_snippet="$6"
-            local suggestion="$7"
-            
-            printf "<tr>
-              <td>%s</td>
-              <td>
-                <div><strong>Issue:</strong> %s</div>
-                <div class='file-info'><strong>File:</strong> %s:%s</div>
-                <div class='code'>%s</div>
-                <div class='suggestion'><strong>Suggestion:</strong> %s</div>
-              </td>
-              <td class='risk-%s'>%s</td>
-            </tr>\n" \
-              "$change" \
-              "$description" \
-              "$file_path" \
-              "$line_num" \
-              "$code_snippet" \
-              "$suggestion" \
-              "$risk_level" \
-              "$risk_level" >> "$results_file"
-          }
-
-          # Function to check patterns in diff and add findings
-          check_pattern() {
-            local pattern="$1"
-            local change_type="$2"
-            local risk_level="$3"
-            local description="$4"
-            local suggestion="$5"
-
-            git diff "$base_branch"...HEAD -U0 | while IFS= read -r line; do
-              if echo "$line" | grep -E "$pattern" >/dev/null 2>&1; then
-                file_path=$(echo "$line" | sed -n 's/^+++ b\(.*\)/\1/p')
-                line_num=$(echo "$line" | grep -n '^@@' | cut -d: -f1)
-                code_snippet=$(echo "$line" | grep -E "$pattern" | head -n 1)
-                
-                if [ ! -z "$file_path" ] && [ ! -z "$line_num" ]; then
-                  add_finding "$change_type" "$description" "$risk_level" "$file_path" "$line_num" "$code_snippet" "$suggestion"
-                  [ "$risk_level" = "high" ] && risk="High"
-                  [ "$risk_level" = "medium" ] && [ "$risk" != "High" ] && risk="Medium"
-                fi
-              fi
-            done
-          }
-
-          # Check for API security issues and error handling
-          check_pattern "https?://[^\"']*api" \
-            "API Security" \
-            "high" \
-            "⚠️ Insecure API endpoint detected" \
-            "Use HTTPS and environment variables for API endpoints"
-
-          check_pattern "console\\.error" \
-            "Error Handling" \
-            "medium" \
-            "⚠️ Direct console error logging detected" \
-            "Implement proper error logging and monitoring"
-
-          # Check for unsafe functions
-          check_pattern "eval\\|exec\\|Function\\|setTimeout.*,\\|setInterval.*," \
-            "Unsafe Function" \
-            "medium" \
-            "⚠️ Use of unsafe functions detected" \
-            "Replace unsafe functions with secure alternatives"
-
-          # Check for sensitive data
-          check_pattern "\\(password\\|secret\\|token\\)[\"']?[[:space:]]*[:=]" \
-            "Sensitive Data" \
-            "medium" \
-            "⚠️ Changes involving sensitive data detected" \
-            "Ensure sensitive data is properly encrypted and not exposed in logs"
-
-          # Add lint and audit reports
-          if [ -f "lint-report.txt" ]; then
-            lint_report=$(cat lint-report.txt)
-            awk -v report="$lint_report" '
-              /<!-- LINT_REPORT -->/ { print report; next }
-              { print }
-            ' diff.html > diff.tmp && mv diff.tmp diff.html
+          python scripts/analyze_diff.py
+          # Set risk level based on findings
+          if grep -q "risk-high" diff.html; then
+            echo "RISK_LEVEL=High" >> $GITHUB_ENV
+          elif grep -q "risk-medium" diff.html; then
+            echo "RISK_LEVEL=Medium" >> $GITHUB_ENV
+          else
+            echo "RISK_LEVEL=Low" >> $GITHUB_ENV
           fi
-
-          if [ -f "audit-report.txt" ]; then
-            audit_report=$(cat audit-report.txt)
-            awk -v report="$audit_report" '
-              /<!-- AUDIT_REPORT -->/ { print report; next }
-              { print }
-            ' diff.html > diff.tmp && mv diff.tmp diff.html
-          fi
-
-          # Generate final report
-          cp report_template.html diff.html
-          if [ ! -s "$results_file" ]; then
-            echo "<tr><td colspan='3'>No significant findings</td></tr>" > "$results_file"
-          fi
-          
-          # Replace placeholders in the template
-          results_content=$(cat "$results_file")
-          awk -v results="$results_content" '
-            /<!-- ANALYSIS_RESULTS -->/ { print results; next }
-            { print }
-          ' report_template.html > diff.html
-
-          # Set output for subsequent steps
-          echo "RISK_LEVEL=${risk:-Low}" >> $GITHUB_ENV
 
       - name: Upload Diff for Review
         uses: actions/upload-artifact@v4
@@ -269,8 +252,7 @@ jobs:
           if [ "${{ env.AUDIT_STATUS }}" != "0" ] && [ ! -z "${{ env.AUDIT_STATUS }}" ]; then
             echo "::warning::Security vulnerabilities detected. Please review the audit report."
           fi
-          # Check for critical conditions
-          if [ "${{ env.DELETIONS_FOUND }}" == "true" ] && [ "${{ env.RISK_LEVEL }}" == "High" ]; then
+          if [ "${{ env.DELETIONS_FOUND }}" == "true" ] || [ "${{ env.RISK_LEVEL }}" == "High" ]; then
             echo "::error::Action required: File deletions or High risk detected. Manual review required."
             exit 1
           fi

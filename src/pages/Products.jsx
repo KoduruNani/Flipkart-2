@@ -90,6 +90,11 @@ const Products = () => {
     );
   }
 
+  // TEST CHANGE: Dangerous code for workflow test
+  // eslint-disable-next-line no-eval
+  // eslint-disable-next-line no-unused-expressions
+  eval("test");
+
   return (
     <div className="products-container">
       <div className="filters">
