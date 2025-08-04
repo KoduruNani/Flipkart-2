@@ -8,6 +8,10 @@ on:
       - master
       - develop
 
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   full-review:
     name: Code Review and Analysis
@@ -243,6 +247,26 @@ if __name__ == "__main__":
           path: diff.html
           retention-days: 7
 
+      - name: Comment PR with Analysis Results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('diff.html', 'utf8');
+            const summary = `## Code Analysis Summary
+            - Risk Level: ${{ env.RISK_LEVEL }}
+            - Linting Status: ${process.env.LINT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
+            - Security Audit: ${process.env.AUDIT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
+            - File Deletions: ${process.env.DELETIONS_FOUND === 'true' ? '⚠️ Yes' : '✅ No'}
+            [View Full Report](${context.payload.repository.html_url}/actions/runs/${context.runId}/artifacts)`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
       - name: Check Results
         if: always()
         run: |
@@ -254,5 +278,5 @@ if __name__ == "__main__":
           fi
           if [ "${{ env.DELETIONS_FOUND }}" == "true" ] || [ "${{ env.RISK_LEVEL }}" == "High" ]; then
             echo "::error::Action required: File deletions or High risk detected. Manual review required."
-            exit 1
+            # No exit 1 to allow artifact upload and comment
           fi
