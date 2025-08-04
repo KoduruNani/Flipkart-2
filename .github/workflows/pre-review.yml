@@ -8,6 +8,11 @@ on:
       - master
       - develop
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   full-review:
     name: Code Review and Analysis
@@ -73,10 +78,7 @@ jobs:
       - name: Run Semantic Diff Analysis
         id: diff-analysis
         run: |
-          # Get the diff and pipe it to the Python script
-          git diff origin/${{ github.base_ref }}...HEAD | python scripts/analyze_diff.py
-
-          # Set the risk level based on the analysis
+          python scripts/analyze_diff.py
           if grep -q "risk-high" diff.html; then
             echo "RISK_LEVEL=High" >> $GITHUB_ENV
           elif grep -q "risk-medium" diff.html; then
@@ -101,17 +103,15 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const report = fs.readFileSync('diff.html', 'utf8');
-            
             const summary = `## Code Analysis Summary
-            
-            - Risk Level: ${{ env.RISK_LEVEL }}
-            - Linting Status: ${process.env.LINT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
-            - Security Audit: ${process.env.AUDIT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
-            - File Deletions: ${process.env.DELETIONS_FOUND === 'true' ? '⚠️ Yes' : '✅ No'}
 
-            [View Full Report](${context.payload.repository.html_url}/actions/runs/${context.runId}/artifacts)`;
-            
+- Risk Level: ${process.env.RISK_LEVEL}
+- Linting Status: ${process.env.LINT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
+- Security Audit: ${process.env.AUDIT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
+- File Deletions: ${process.env.DELETIONS_FOUND === 'true' ? '⚠️ Yes' : '✅ No'}
+
+[View Full Report](${context.payload.repository.html_url}/actions/runs/${context.runId}/artifacts)`;
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
