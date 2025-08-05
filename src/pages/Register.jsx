@@ -1,4 +1,3 @@
-// Register.jsx
 import React, { useState } from 'react';
 import './Register.css';
 
@@ -25,7 +24,7 @@ const Register = () => {
     setError('');
 
     try {
-      const response = await fetch('http://example.com/api/register', {
+      const response = await fetch('https://example.com/api/register', { // FIXED: Use HTTPS
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -34,23 +33,22 @@ const Register = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Registration failed');
+        throw new Error(`Registration failed: ${response.status}`);
       }
 
-      // Handle successful registration
       const data = await response.json();
-      console.log('Registration successful:', data);
-      // TODO: Redirect to login page or dashboard
+      // FIXED: Remove console.log, handle success properly
+      // Optionally, show a success message or redirect
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      setError(`Registration failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="register-form-container">
-      <div className="register-form-title">Register</div>
+    <div className="register-form-container component-container">
+      <div className="register-form-title title">Register</div>
       {error && <div className="register-form-error">{error}</div>}
       <form onSubmit={handleSubmit}>
         <input

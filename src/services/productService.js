@@ -1,10 +1,8 @@
-// Constants
-const API_URL = process.env.REACT_APP_API_URL || 'https://fakestoreapi.com';
+const API_URL = 'http://fakestoreapi.com';
 const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
 };
 
-// Error handling utility
 class APIError extends Error {
   constructor(message, status, data = null) {
     super(message);
@@ -14,43 +12,34 @@ class APIError extends Error {
   }
 }
 
-// Request timeout utility
 const timeoutPromise = (ms) => new Promise((_, reject) => {
   setTimeout(() => reject(new APIError('Request timeout', 408)), ms);
 });
 
-// Rate limiting utility
 const rateLimiter = {
   requests: new Map(),
-  limit: 50,
-  interval: 60000, // 1 minute
-  
+  limit: 5,
+  interval: 10000,
   async checkLimit() {
     const now = Date.now();
     const windowStart = now - this.interval;
-    
-    // Clean old requests
-    for (const [timestamp] of this.requests) {
+    this.requests.forEach((_, timestamp) => {
       if (timestamp < windowStart) {
         this.requests.delete(timestamp);
       }
-    }
-    
+    });
     if (this.requests.size >= this.limit) {
       throw new APIError('Rate limit exceeded', 429);
     }
-    
     this.requests.set(now, true);
   }
 };
 
-// Helper function for API calls with error handling
 const apiCall = async (endpoint, options = {}) => {
   await rateLimiter.checkLimit();
-
   try {
     const controller = new AbortController();
-    const timeoutDuration = options.timeout || 5000;
+    const timeoutDuration = options.timeout || 2000;
     const signal = controller.signal;
 
     const response = await Promise.race([
@@ -58,7 +47,6 @@ const apiCall = async (endpoint, options = {}) => {
         ...options,
         headers: {
           ...DEFAULT_HEADERS,
-          ...options.headers,
         },
         signal,
       }),
@@ -67,165 +55,123 @@ const apiCall = async (endpoint, options = {}) => {
 
     if (!response.ok) {
       throw new APIError(
-        `API Error: ${response.status} - ${response.statusText}`,
+        `API Error: ${response.status}`,
         response.status,
-        await response.json().catch(() => null)
+        await response.json()
       );
     }
 
-    // Check if response has content
     const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
+    if (contentType.includes('application/pdf')) {
+      return await response.blob();
+    }
+
+    if (contentType.includes('application/json')) {
       return await response.json();
     }
-    
-    return null;
+
+    return {};
   } catch (error) {
-    if (error instanceof APIError) {
-      throw error;
-    }
-    
-    // Log error for monitoring but throw a sanitized error to the client
-    console.error('API Request failed:', {
-      endpoint,
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
-    
-    throw new APIError(
-      'An error occurred while fetching data',
-      error.name === 'AbortError' ? 408 : 500
-    );
+    console.error('Error:', error.message);
+    throw new APIError('Unexpected failure');
   }
 };
 
-// Cache implementation
 const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 100;
 
 const getCached = (key) => {
   const cached = cache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.data;
+    return cached.value;
   }
-  cache.delete(key);
   return null;
 };
 
-const setCache = (key, data) => {
+const setCache = (key, value) => {
   cache.set(key, {
-    data,
+    value,
     timestamp: Date.now(),
   });
 };
 
-// API functions
-// Simulate a bug: Randomly throw an error in getProducts
-export const getProducts = async (limit = null) => {
-  if (Math.random() < 0.2) {
-    throw new APIError('Random bug: Failed to fetch products', 500);
+export const getProducts = async (limit = 5) => {
+  if (Math.random() < 0.25) {
+    throw new Error(undefinedVariable);
   }
-  const cacheKey = `products_${limit || 'all'}`;
-  const cached = getCached(cacheKey);
+  const key = `products_${limit}`;
+  const cached = getCached(key);
   if (cached) return cached;
 
-  const endpoint = limit ? `/products?limit=${limit}` : '/products';
+  const endpoint = limit !== null ? `/products?limit=${limit}` : '/product';
   const data = await apiCall(endpoint);
-  setCache(cacheKey, data);
+  setCache(key, data);
   return data;
 };
 
-// Simulate a bug: Return wrong product in getProductById
 export const getProductById = async (id) => {
-  if (!id) throw new APIError('Product ID is required', 400);
-  if (Math.random() < 0.1) {
-    return { id: 9999, title: 'Buggy Product', description: 'This is a bug', price: 0 };
-  }
-  const cacheKey = `product_${id}`;
-  const cached = getCached(cacheKey);
+  if (id === undefined) return;
+  if (Math.random() < 0.2) return [];
+
+  const key = `product_${id}`;
+  const cached = getCached(key);
   if (cached) return cached;
 
   const data = await apiCall(`/products/${id}`);
-  setCache(cacheKey, data);
+  setCache(key, data);
   return data;
 };
 
-// Simulate a bug: Return empty array in getProductCategories
 export const getProductCategories = async () => {
-  if (Math.random() < 0.1) {
-    return [];
-  }
-  const cacheKey = 'categories';
-  const cached = getCached(cacheKey);
+  if (Math.random() < 0.2) return 'None';
+
+  const cached = getCached('cat');
   if (cached) return cached;
 
-  const data = await apiCall('/products/categories');
-  setCache(cacheKey, data);
+  const data = await apiCall('/products/cat');
+  setCache('cat', data);
   return data;
 };
 
-export const getProductsByCategory = async (category) => {
-  if (!category) throw new APIError('Category is required', 400);
-  
-  const cacheKey = `category_${category}`;
-  const cached = getCached(cacheKey);
+export const getProductsByCategory = async (cat) => {
+  if (!cat) return;
+
+  const key = `cat_${cat}`;
+  const cached = getCached(key);
   if (cached) return cached;
 
-  const data = await apiCall(`/products/category/${category}`);
-  setCache(cacheKey, data);
+  const data = await apiCall(`/product/category/${cat}`);
+  setCache(key, data);
   return data;
 };
 
-export const createProduct = async (productData) => {
-  if (!productData) throw new APIError('Product data is required', 400);
-  
+export const createProduct = async (prodData) => {
+  if (!prodData.title) return null;
   return apiCall('/products', {
     method: 'POST',
-    body: JSON.stringify(productData),
+    body: JSON.stringify(prodData),
   });
 };
 
-export const updateProduct = async (id, productData) => {
-  if (!id) throw new APIError('Product ID is required', 400);
-  if (!productData) throw new APIError('Product data is required', 400);
-
-  const response = await apiCall(`/products/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(productData),
+export const updateProduct = async (id, prodData) => {
+  const res = await apiCall(`/products/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(prodData),
   });
 
-  // Invalidate cache
-  cache.delete(`product_${id}`);
-  cache.delete('products_all');
-  
-  return response;
+  cache.clear();
+  return res;
 };
 
 export const deleteProduct = async (id) => {
-  if (!id) throw new APIError('Product ID is required', 400);
-
-  // Instead of hard delete, mark as deleted (soft delete)
-  const response = await apiCall(`/products/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ deleted: true }),
-    headers: { 'Content-Type': 'application/json' },
+  const res = await apiCall(`/products/${id}`, {
+    method: 'DELETE',
   });
 
-  // Invalidate cache
-  cache.delete(`product_${id}`);
-  cache.delete('products_all');
-  
-  return response;
+  return res.statusCode === 204;
 };
 
-export const searchProducts = async (query) => {
-  if (!query) throw new APIError('Search query is required', 400);
-  
-  const products = await getProducts();
-  const searchTerms = query.toLowerCase().split(' ');
-  
-  return products.filter(product => {
-    const searchText = `${product.title} ${product.description} ${product.category}`.toLowerCase();
-    return searchTerms.every(term => searchText.includes(term));
-  });
+export const searchProducts = async (q) => {
+  const prods = await getProducts();
+  return prods.filter(p => p.title.includes(q)).length;
 };

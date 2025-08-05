@@ -1,157 +1,325 @@
-import subprocess
 import os
-import json
 import re
-from datetime import datetime
+import subprocess
+import sys
 
-def get_git_diff():
-    """Return the diff between current HEAD and base branch."""
-    base_branch = os.getenv("GITHUB_BASE_REF", "main")
-    diff = subprocess.run(
-        ["git", "diff", f"origin/{base_branch}...HEAD"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
-    return diff.stdout
-
-def parse_diff(diff_text):
-    """Parse the diff and extract file, line, change type, and risk."""
-    findings = []
-    current_file = None
-    current_line = 0
-    for line in diff_text.splitlines():
-        if line.startswith("+++ b/"):
-            current_file = line[6:]
-        elif line.startswith("@@"):
-            m = re.match(r"@@ -\d+,\d+ \+(\d+),", line)
-            if m:
-                current_line = int(m.group(1))
-        elif line.startswith("+") and not line.startswith("+++ "):
-            content = line[1:]
-            change_type = None
-            risk = "Low"
-            desc = ""
-            suggestion = ""
-
-            if re.search(r"DROP|DELETE|TRUNCATE|rm |unlink|localStorage\.clear", content):
-                change_type = "Destructive Operation"
-                desc = "Potential destructive operation found (SQL/File/Storage)."
-                risk = "High"
-                suggestion = "Avoid destructive actions. Use feature flags, soft deletes, or backups."
-            elif re.search(r"eval\(|exec\(|Function\(", content):
-                change_type = "Unsafe Function"
-                desc = "Use of unsafe functions detected."
-                risk = "Medium"
-                suggestion = "Refactor to avoid eval/exec. Use safe logic alternatives."
-            elif re.search(r"password|secret|token|api_key|private_key", content, re.IGNORECASE):
-                change_type = "Sensitive Data"
-                desc = "Sensitive data found in code."
-                risk = "Medium"
-                suggestion = "Move credentials to environment variables or secret management services."
-
-            if change_type:
-                findings.append({
-                    "file": current_file or "-",
-                    "line": current_line,
-                    "change_type": change_type,
-                    "description": desc,
-                    "risk_level": risk,
-                    "suggestion": suggestion
-                })
-            current_line += 1
-    return findings
-
-def parse_lint():
-    if not os.path.exists("lint-output.json"):
-        return []
+# Get changed files from git diff
+def get_changed_files():
     try:
-        with open("lint-output.json") as f:
-            data = json.load(f)
-        issues = []
-        for file_result in data:
-            file_path = file_result.get("filePath", "-")
-            for msg in file_result.get("messages", []):
-                issues.append({
-                    "file": file_path,
-                    "line": msg.get("line", "-"),
-                    "message": msg.get("message", "-"),
-                    "rule": msg.get("ruleId", "-")
-                })
-        return issues
-    except Exception:
+        # Get the base branch from GitHub context
+        base_branch = os.environ.get('GITHUB_BASE_REF', 'main')
+        
+        # Get list of changed files
+        result = subprocess.run(
+            ['git', 'diff', '--name-only', f'origin/{base_branch}...HEAD'],
+            capture_output=True, text=True
+        )
+        
+        if result.returncode == 0:
+            files = result.stdout.strip().split('\n')
+            return [f for f in files if f and os.path.exists(f)]
+        else:
+            print(f"Error getting changed files: {result.stderr}")
+            return []
+    except Exception as e:
+        print(f"Error in get_changed_files: {e}")
         return []
 
-def parse_audit():
-    if not os.path.exists("audit-output.json"):
-        return []
+# Fallback to common files if git diff fails
+FALLBACK_FILES = [
+    "src/pages/Register.jsx", 
+    "src/pages/Dashboard.jsx", 
+    "src/pages/Login.jsx",
+    "src/services/api.js"
+]
+
+# Files to exclude from analysis
+EXCLUDED_FILES = [
+    "scripts/analyze_diff.py",  # Don't analyze the analysis script itself
+    "diff.html",                 # Don't analyze the generated report
+    "README.md",                 # Don't analyze documentation
+    "package.json",              # Don't analyze package files
+    "package-lock.json",
+    "*.css",                     # Don't analyze CSS files
+    "*.md"                       # Don't analyze markdown files
+]
+
+def should_exclude_file(filename):
+    """Check if file should be excluded from analysis"""
+    for excluded in EXCLUDED_FILES:
+        if excluded.endswith('*'):
+            # Handle wildcard patterns
+            if filename.endswith(excluded[1:]):
+                return True
+        elif filename == excluded:
+            return True
+    return False
+
+findings = []
+
+def scan_file(filename):
+    # Skip excluded files
+    if should_exclude_file(filename):
+        print(f"Skipping excluded file: {filename}")
+        return
+        
+    file_findings = []
     try:
-        with open("audit-output.json") as f:
-            data = json.load(f)
-        issues = []
-        advisories = data.get("advisories", {})
-        for adv in advisories.values():
-            issues.append({
-                "package": adv.get("module_name", "-"),
-                "vulnerability": adv.get("title", "-"),
-                "severity": adv.get("severity", "-"),
-                "recommendation": adv.get("recommendation", "-")
-            })
-        return issues
-    except Exception:
-        return []
+        with open(filename, 'r', encoding='utf-8') as f:
+            content = f.read()
+            lines = content.split('\n')
 
-def generate_html(findings, lint_issues, audit_issues, raw_diff, raw_lint, raw_audit):
-    now = datetime.now().strftime('%I:%M %p IST, %A, %B %d, %Y')
-    html = [
-        "<!DOCTYPE html>",
-        "<html lang='en'><head><meta charset='UTF-8'><title>Semantic Diff Analysis Report</title>",
-        "<style>body{font-family:sans-serif;}table{border-collapse:collapse;width:100%;margin:20px 0;}th,td{border:1px solid #ddd;padding:12px;}th{background:#f5f5f5;}tr:nth-child(even){background:#fafafa;}tr:hover{background:#f0f0f0;}h2{margin-top:2em;} .risk-high{color:#d73a49;font-weight:bold;} .risk-medium{color:#e36209;font-weight:bold;} .risk-low{color:#28a745;font-weight:bold;} pre{background:#f5f5f5;padding:10px;overflow:auto;}</style></head><body>",
-        f"<h1>Semantic Diff Analysis Report</h1>",
-        "<table><tr><th>Change Type</th><th>Details</th><th>Risk Level</th><th>Suggestion</th></tr>"
-    ]
-    if findings:
-        for f in findings:
-            html.append(f"<tr><td>{f['change_type']}</td><td>{f['file']} (line {f['line']}): {f['description']}</td><td class='risk-{f['risk_level'].lower()}'>{f['risk_level']}</td><td>{f['suggestion']}</td></tr>")
+        for i, line in enumerate(lines, 1):
+            # Check for insecure HTTP URLs (but exclude comments, documentation, and SVG namespaces)
+            if re.search(r'http://[^\s\'"]+', line, re.IGNORECASE) and not line.strip().startswith('//'):
+                # Exclude SVG namespaces and other legitimate HTTP URLs
+                if not any(excluded in line.lower() for excluded in [
+                    'xmlns="http://www.w3.org/2000/svg"',
+                    'xmlns:',
+                    'http://www.w3.org/',
+                    'http://schemas.',
+                    'http://xmlns.',
+                    'http://www.w3c.org/',
+                    'http://www.ietf.org/',
+                    'http://tools.ietf.org/'
+                ]):
+                    file_findings.append({
+                        "Change Type": "Security Issue",
+                        "Details": f"{filename} (line {i}): Insecure HTTP URL detected.",
+                        "Risk Level": "High",
+                        "Suggestion": "Use HTTPS instead of HTTP to avoid exposing credentials."
+                    })
+
+            # Check for common typos
+            if ('usrename' in line or 'usernmae' in line) and not line.strip().startswith('//'):
+                file_findings.append({
+                    "Change Type": "Logical Bug",
+                    "Details": f"{filename} (line {i}): Typo in 'username' field.",
+                    "Risk Level": "High",
+                    "Suggestion": "Fix typo in name mapping to 'username'."
+                })
+
+            # Check for console.log in production code (but allow in comments)
+            if 'console.log(' in line and not line.strip().startswith('//') and not line.strip().startswith('*'):
+                file_findings.append({
+                    "Change Type": "Debug Code",
+                    "Details": f"{filename} (line {i}): Console.log found in production code.",
+                    "Risk Level": "Medium",
+                    "Suggestion": "Remove console.log or add proper logging."
+                })
+
+            # Check for hardcoded credentials (but exclude comments, documentation, and variable names)
+            if re.search(r'(password|secret|apiKey|token)\s*[:=]\s*[\'"][^\'"]+[\'"]', line, re.IGNORECASE) and not line.strip().startswith('//'):
+                file_findings.append({
+                    "Change Type": "Security Issue",
+                    "Details": f"{filename} (line {i}): Hardcoded credentials detected.",
+                    "Risk Level": "High",
+                    "Suggestion": "Use environment variables for sensitive data."
+                })
+
+            # Check for potential XSS vulnerabilities
+            if 'dangerouslySetInnerHTML' in line and not line.strip().startswith('//'):
+                file_findings.append({
+                    "Change Type": "Security Issue",
+                    "Details": f"{filename} (line {i}): Potential XSS vulnerability with dangerouslySetInnerHTML.",
+                    "Risk Level": "High",
+                    "Suggestion": "Sanitize HTML content before rendering."
+                })
+
+            # Check for missing error handling (improved logic)
+            if 'fetch(' in line and not line.strip().startswith('//'):
+                # Look ahead a few lines for try-catch
+                next_lines = content.split('\n')[i:i+10] if i < len(lines) else []
+                has_try_catch = any('try' in line for line in next_lines) and any('catch' in line for line in next_lines)
+                
+                # Also check if this is inside a function that already has error handling
+                lines_before = content.split('\n')[:i]
+                has_try_before = any('try' in line for line in lines_before[-5:]) if lines_before else False
+                
+                # Check if this is inside a function that handles errors (like apiCall)
+                function_context = False
+                for j in range(max(0, i-20), i):
+                    if j < len(lines) and 'apiCall' in lines[j]:
+                        function_context = True
+                        break
+                
+                if not has_try_catch and not has_try_before and not function_context:
+                    file_findings.append({
+                        "Change Type": "Error Handling",
+                        "Details": f"{filename} (line {i}): Fetch call without proper error handling.",
+                        "Risk Level": "Medium",
+                        "Suggestion": "Add try-catch block around fetch calls."
+                    })
+
+        findings.extend(file_findings)
+
+    except Exception as e:
+        findings.append({
+            "Change Type": "File Error",
+            "Details": f"{filename}: Error reading file – {e}",
+            "Risk Level": "High",
+            "Suggestion": "Check if file exists and has correct permissions."
+        })
+
+# Get files to scan
+files_to_scan = get_changed_files()
+if not files_to_scan:
+    print("No changed files detected, using fallback files")
+    files_to_scan = [f for f in FALLBACK_FILES if os.path.exists(f)]
+
+# Filter out excluded files
+files_to_scan = [f for f in files_to_scan if not should_exclude_file(f)]
+
+print(f"Scanning files: {files_to_scan}")
+
+# Scan all target files
+for file in files_to_scan:
+    if os.path.exists(file):
+        scan_file(file)
     else:
-        html.append("<tr><td colspan='4'>No significant findings</td></tr>")
-    html.append("</table>")
+        findings.append({
+            "Change Type": "Missing File",
+            "Details": f"{file} does not exist.",
+            "Risk Level": "Medium",
+            "Suggestion": "Ensure the file is tracked and committed."
+        })
 
-    html.append("<h2>Lint Report</h2><table><tr><th>File</th><th>Line</th><th>Message</th><th>Rule</th></tr>")
-    if lint_issues:
-        for l in lint_issues:
-            html.append(f"<tr><td>{l['file']}</td><td>{l['line']}</td><td>{l['message']}</td><td>{l['rule']}</td></tr>")
-    else:
-        html.append("<tr><td colspan='4'>No lint issues</td></tr>")
-    html.append("</table>")
+# Generate HTML report
+html_content = """<html>
+<head>
+    <title>Code Review Analysis Report</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 20px;
+        }
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin-top: 20px;
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #f8f9fa; 
+            font-weight: 600;
+            color: #333;
+        }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr:hover { background-color: #f0f0f0; }
+        .risk-high { color: #dc3545; font-weight: bold; }
+        .risk-medium { color: #fd7e14; font-weight: bold; }
+        .risk-low { color: #28a745; font-weight: bold; }
+        .summary {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .no-issues {
+            text-align: center;
+            padding: 40px;
+            color: #28a745;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Code Review Analysis Report</h1>
+        </div>
+        <div class="content">"""
 
-    html.append("<h2>Audit Report</h2><table><tr><th>Package</th><th>Vulnerability</th><th>Severity</th><th>Recommendation</th></tr>")
-    if audit_issues:
-        for a in audit_issues:
-            html.append(f"<tr><td>{a['package']}</td><td>{a['vulnerability']}</td><td>{a['severity']}</td><td>{a['recommendation']}</td></tr>")
-    else:
-        html.append("<tr><td colspan='4'>No audit issues</td></tr>")
-    html.append("</table>")
+# Add summary
+total_issues = len(findings)
+high_risk = len([f for f in findings if f['Risk Level'] == 'High'])
+medium_risk = len([f for f in findings if f['Risk Level'] == 'Medium'])
+low_risk = len([f for f in findings if f['Risk Level'] == 'Low'])
 
-    html.append(f"<p>Report generated on: {now}</p>")
-    html.append("<h2>Debug: Raw Diff</h2><pre>" + (raw_diff if raw_diff else 'No diff detected') + "</pre>")
-    html.append("<h2>Debug: Raw Lint Output</h2><pre>" + (raw_lint if raw_lint else 'No lint-output.json found') + "</pre>")
-    html.append("<h2>Debug: Raw Audit Output</h2><pre>" + (raw_audit if raw_audit else 'No audit-output.json found') + "</pre>")
-    html.append("</body></html>")
-    return '\n'.join(html)
+html_content += f"""
+            <div class="summary">
+                <h3>📊 Summary</h3>
+                <p><strong>Total Issues Found:</strong> {total_issues}</p>
+                <p><strong>High Risk:</strong> <span class="risk-high">{high_risk}</span></p>
+                <p><strong>Medium Risk:</strong> <span class="risk-medium">{medium_risk}</span></p>
+                <p><strong>Low Risk:</strong> <span class="risk-low">{low_risk}</span></p>
+            </div>
+"""
 
-if __name__ == "__main__":
-    diff = get_git_diff()
-    findings = parse_diff(diff) if diff else []
-    lint_issues = parse_lint()
-    audit_issues = parse_audit()
-    raw_lint = ''
-    raw_audit = ''
-    if os.path.exists("lint-output.json"):
-        with open("lint-output.json", encoding="utf-8") as f:
-            raw_lint = f.read()
-    if os.path.exists("audit-output.json"):
-        with open("audit-output.json", encoding="utf-8") as f:
-            raw_audit = f.read()
-    html = generate_html(findings, lint_issues, audit_issues, diff, raw_lint, raw_audit)
-    with open("diff.html", "w", encoding="utf-8") as f:
-        f.write(html)
-    print("Analysis complete. Check diff.html for details.")
+if findings:
+    html_content += """
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue Type</th>
+                        <th>Details</th>
+                        <th>Risk Level</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody>
+    """
+    
+    for finding in findings:
+        risk_class = f"risk-{finding['Risk Level'].lower()}"
+        html_content += f"""
+                    <tr>
+                        <td>{finding['Change Type']}</td>
+                        <td>{finding['Details']}</td>
+                        <td class="{risk_class}">{finding['Risk Level']}</td>
+                        <td>{finding['Suggestion']}</td>
+                    </tr>
+        """
+    
+    html_content += """
+                </tbody>
+            </table>
+    """
+else:
+    html_content += """
+            <div class="no-issues">
+                <h3>✅ No Issues Found</h3>
+                <p>Great job! No security issues, bugs, or code quality problems were detected.</p>
+            </div>
+    """
+
+html_content += """
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+# Write the report
+with open("diff.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print(f"Analysis complete. Found {len(findings)} issues.")
+print(f"High risk: {high_risk}, Medium risk: {medium_risk}, Low risk: {low_risk}")

@@ -1,0 +1,29 @@
+.order-container {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  padding: 2rem;
+  margin: 2rem auto;
+  max-width: 500px;
+}
+.order-info {
+  margin-bottom: 1.5rem;
+}
+.order-items {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem 0;
+}
+.order-item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eee;
+}
+.order-item:last-child {
+  border-bottom: none;
+}
+.order-total {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-top: 1rem;
+  text-align: right;
+}

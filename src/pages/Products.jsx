@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { getProducts, getProductCategories } from '../services/productService';
+import { getProducts, getProductCategories, createProduct, updateProduct, deleteProduct } from '../services/productService';
 import { useCartWishlist } from '../components/CartWishlistContext';
 import './Products.css';
 
@@ -11,6 +11,9 @@ const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [formState, setFormState] = useState({ title: '', price: '', description: '', category: '', image: '' });
+  const [formError, setFormError] = useState('');
 
   const { addToCart, addToWishlist, cart, wishlist } = useCartWishlist();
 
@@ -82,6 +85,51 @@ const Products = () => {
     setSortBy(e.target.value);
   };
 
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    setFormError('');
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, formState);
+      } else {
+        await createProduct(formState);
+      }
+      setFormState({ title: '', price: '', description: '', category: '', image: '' });
+      setEditingProduct(null);
+      fetchData();
+    } catch (err) {
+      setFormError('Failed to save product.');
+    }
+  };
+
+  const handleEdit = (product) => {
+    setEditingProduct(product);
+    setFormState({
+      title: product.title,
+      price: product.price,
+      description: product.description,
+      category: product.category,
+      image: product.image || ''
+    });
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+      await deleteProduct(id);
+      fetchData();
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProduct(null);
+    setFormState({ title: '', price: '', description: '', category: '', image: '' });
+  };
+
   if (error) {
     return (
       <div className="error-container">
@@ -132,7 +180,19 @@ const Products = () => {
           <option value="name-desc">Name: Z to A</option>
         </select>
       </div>
-
+      <div className="crud-form-container component-container">
+        <h2 className="title">{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
+        {formError && <div className="error-message">{formError}</div>}
+        <form onSubmit={handleFormSubmit}>
+          <input name="title" value={formState.title} onChange={handleFormChange} placeholder="Title" required />
+          <input name="price" value={formState.price} onChange={handleFormChange} placeholder="Price" type="number" min="0" step="0.01" required />
+          <input name="category" value={formState.category} onChange={handleFormChange} placeholder="Category" required />
+          <input name="image" value={formState.image} onChange={handleFormChange} placeholder="Image URL" />
+          <textarea name="description" value={formState.description} onChange={handleFormChange} placeholder="Description" required />
+          <button type="submit" className="add-to-cart-btn">{editingProduct ? 'Update' : 'Create'}</button>
+          {editingProduct && <button type="button" onClick={handleCancelEdit} className="add-to-wishlist-btn">Cancel</button>}
+        </form>
+      </div>
       {loading ? (
         <div className="loading-container">
           <div className="loading-spinner"></div>
@@ -170,6 +230,8 @@ const Products = () => {
                 >
                   {wishlist.find((item) => item.id === product.id) ? 'In Wishlist' : 'Add to Wishlist'}
                 </button>
+                <button onClick={() => handleEdit(product)} className="add-to-cart-btn">Edit</button>
+                <button onClick={() => handleDelete(product.id)} className="add-to-wishlist-btn">Delete</button>
               </div>
             </div>
           ))}

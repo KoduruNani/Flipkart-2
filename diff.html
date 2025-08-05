@@ -1,0 +1,88 @@
+<html>
+<head>
+    <title>Code Review Analysis Report</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 20px;
+        }
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin-top: 20px;
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #f8f9fa; 
+            font-weight: 600;
+            color: #333;
+        }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr:hover { background-color: #f0f0f0; }
+        .risk-high { color: #dc3545; font-weight: bold; }
+        .risk-medium { color: #fd7e14; font-weight: bold; }
+        .risk-low { color: #28a745; font-weight: bold; }
+        .summary {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .no-issues {
+            text-align: center;
+            padding: 40px;
+            color: #28a745;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Code Review Analysis Report</h1>
+        </div>
+        <div class="content">
+            <div class="summary">
+                <h3>📊 Summary</h3>
+                <p><strong>Total Issues Found:</strong> 0</p>
+                <p><strong>High Risk:</strong> <span class="risk-high">0</span></p>
+                <p><strong>Medium Risk:</strong> <span class="risk-medium">0</span></p>
+                <p><strong>Low Risk:</strong> <span class="risk-low">0</span></p>
+            </div>
+
+            <div class="no-issues">
+                <h3>✅ No Issues Found</h3>
+                <p>Great job! No security issues, bugs, or code quality problems were detected.</p>
+            </div>
+    
+        </div>
+    </div>
+</body>
+</html>
