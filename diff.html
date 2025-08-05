@@ -1,0 +1,202 @@
+<html>
+<head>
+    <title>Code Review Analysis Report</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 20px;
+        }
+        table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin-top: 20px;
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #f8f9fa; 
+            font-weight: 600;
+            color: #333;
+        }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr:hover { background-color: #f0f0f0; }
+        .risk-high { color: #dc3545; font-weight: bold; }
+        .risk-medium { color: #fd7e14; font-weight: bold; }
+        .risk-low { color: #28a745; font-weight: bold; }
+        .summary {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .no-issues {
+            text-align: center;
+            padding: 40px;
+            color: #28a745;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Code Review Analysis Report</h1>
+        </div>
+        <div class="content">
+            <div class="summary">
+                <h3>📊 Summary</h3>
+                <p><strong>Total Issues Found:</strong> 15</p>
+                <p><strong>High Risk:</strong> <span class="risk-high">9</span></p>
+                <p><strong>Medium Risk:</strong> <span class="risk-medium">6</span></p>
+                <p><strong>Low Risk:</strong> <span class="risk-low">0</span></p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issue Type</th>
+                        <th>Details</th>
+                        <th>Risk Level</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody>
+    
+                    <tr>
+                        <td>Security Issue</td>
+                        <td>README.md (line 8): Insecure HTTP URL detected.</td>
+                        <td class="risk-high">High</td>
+                        <td>Use HTTPS instead of HTTP to avoid exposing credentials.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Logical Bug</td>
+                        <td>README.md (line 14): Typo in 'username' field.</td>
+                        <td class="risk-high">High</td>
+                        <td>Fix typo in name mapping to 'username'.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Security Issue</td>
+                        <td>scripts/analyze_diff.py (line 47): Insecure HTTP URL detected.</td>
+                        <td class="risk-high">High</td>
+                        <td>Use HTTPS instead of HTTP to avoid exposing credentials.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Logical Bug</td>
+                        <td>scripts/analyze_diff.py (line 56): Typo in 'username' field.</td>
+                        <td class="risk-high">High</td>
+                        <td>Fix typo in name mapping to 'username'.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Debug Code</td>
+                        <td>scripts/analyze_diff.py (line 65): Console.log found in production code.</td>
+                        <td class="risk-medium">Medium</td>
+                        <td>Remove console.log or add proper logging.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Security Issue</td>
+                        <td>scripts/analyze_diff.py (line 83): Potential XSS vulnerability with dangerouslySetInnerHTML.</td>
+                        <td class="risk-high">High</td>
+                        <td>Sanitize HTML content before rendering.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Security Issue</td>
+                        <td>scripts/analyze_diff.py (line 86): Potential XSS vulnerability with dangerouslySetInnerHTML.</td>
+                        <td class="risk-high">High</td>
+                        <td>Sanitize HTML content before rendering.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Error Handling</td>
+                        <td>scripts/analyze_diff.py (line 92): Fetch call without proper error handling.</td>
+                        <td class="risk-medium">Medium</td>
+                        <td>Add try-catch block around fetch calls.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Security Issue</td>
+                        <td>src/components/Header.jsx (line 107): Insecure HTTP URL detected.</td>
+                        <td class="risk-high">High</td>
+                        <td>Use HTTPS instead of HTTP to avoid exposing credentials.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Security Issue</td>
+                        <td>src/pages/Login.jsx (line 15): Insecure HTTP URL detected.</td>
+                        <td class="risk-high">High</td>
+                        <td>Use HTTPS instead of HTTP to avoid exposing credentials.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Error Handling</td>
+                        <td>src/pages/Login.jsx (line 15): Fetch call without proper error handling.</td>
+                        <td class="risk-medium">Medium</td>
+                        <td>Add try-catch block around fetch calls.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Error Handling</td>
+                        <td>src/pages/Register.jsx (line 27): Fetch call without proper error handling.</td>
+                        <td class="risk-medium">Medium</td>
+                        <td>Add try-catch block around fetch calls.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Debug Code</td>
+                        <td>src/pages/Register.jsx (line 40): Console.log found in production code.</td>
+                        <td class="risk-medium">Medium</td>
+                        <td>Remove console.log or add proper logging.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Error Handling</td>
+                        <td>src/services/productService.js (line 51): Fetch call without proper error handling.</td>
+                        <td class="risk-medium">Medium</td>
+                        <td>Add try-catch block around fetch calls.</td>
+                    </tr>
+        
+                    <tr>
+                        <td>Security Issue</td>
+                        <td>src/services/productService.js (line 148): Hardcoded credentials detected.</td>
+                        <td class="risk-high">High</td>
+                        <td>Use environment variables for sensitive data.</td>
+                    </tr>
+        
+                </tbody>
+            </table>
+    
+        </div>
+    </div>
+</body>
+</html>

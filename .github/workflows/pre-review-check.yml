@@ -83,7 +83,7 @@ jobs:
       - name: Print git diff for debug
         run: |
           echo "=== Git Diff Debug ==="
-          git diff origin/${{ github.base_ref }}...HEAD || echo "::warning::No diff detected"
+          git diff --name-only origin/${{ github.base_ref }}...HEAD || echo "::warning::No diff detected"
 
       - name: Ensure analyze_diff.py is executable
         run: chmod +x scripts/analyze_diff.py
@@ -92,13 +92,26 @@ jobs:
         id: diff-analysis
         continue-on-error: true
         run: |
+          echo "Running semantic analysis..."
           python scripts/analyze_diff.py
-          if grep -q "High" diff.html; then
-            echo "RISK_LEVEL=High" >> $GITHUB_ENV
-          elif grep -q "Medium" diff.html; then
-            echo "RISK_LEVEL=Medium" >> $GITHUB_ENV
+          
+          # Check if diff.html was created
+          if [ -f "diff.html" ]; then
+            echo "✅ Analysis report generated successfully"
+            # Extract risk level from the HTML content
+            if grep -q "risk-high" diff.html; then
+              echo "RISK_LEVEL=High" >> $GITHUB_ENV
+              echo "::warning::High risk issues detected"
+            elif grep -q "risk-medium" diff.html; then
+              echo "RISK_LEVEL=Medium" >> $GITHUB_ENV
+              echo "::warning::Medium risk issues detected"
+            else
+              echo "RISK_LEVEL=Low" >> $GITHUB_ENV
+              echo "✅ No high/medium risk issues found"
+            fi
           else
-            echo "RISK_LEVEL=Low" >> $GITHUB_ENV
+            echo "::error::Analysis report not generated"
+            echo "RISK_LEVEL=Unknown" >> $GITHUB_ENV
           fi
 
       - name: Upload Diff Report
@@ -131,6 +144,12 @@ jobs:
       - name: Final Gate Check
         if: always() 
         run: |
+          echo "=== Final Gate Check ==="
+          echo "Risk Level: ${{ env.RISK_LEVEL }}"
+          echo "Deletions Found: ${{ env.DELETIONS_FOUND }}"
+          echo "Lint Status: ${{ env.LINT_STATUS }}"
+          echo "Audit Status: ${{ env.AUDIT_STATUS }}"
+          
           if [ "${{ env.LINT_STATUS }}" != "0" ]; then
             echo "::warning::Lint issues found."
           fi
@@ -141,3 +160,4 @@ jobs:
             echo "::error::Manual review required due to deletions or high-risk changes."
             exit 1
           fi
+          echo "✅ All checks passed - PR can proceed"
