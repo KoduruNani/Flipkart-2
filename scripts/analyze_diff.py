@@ -35,14 +35,6 @@ def scan_file(filename):
                     "Suggestion": "Verify comment accuracy or remove."
                 })
 
-        if filename.endswith("Dashboard.jsx") and not file_findings:
-            file_findings.append({
-                "Change Type": "Code Quality",
-                "Details": f"{filename}: No issues found.",
-                "Risk Level": "None",
-                "Suggestion": "-"
-            })
-
         findings.extend(file_findings)
 
     except Exception as e:
@@ -65,7 +57,7 @@ for file in TARGET_FILES:
             "Suggestion": "Ensure the file is tracked and committed."
         })
 
-# Generate HTML
+# Generate HTML only if there are findings
 html_content = """<html><head><title>Semantic Diff Report</title>
 <style>
 body { font-family: Arial, sans-serif; padding: 20px; }
@@ -75,14 +67,17 @@ th { background-color: #f2f2f2; }
 tr:nth-child(even) { background-color: #f9f9f9; }
 h2 { color: #333; }
 </style></head><body>
-<h2>🔍 Code Review Summary</h2>
-<table>
-<tr><th>Change Type</th><th>Details</th><th>Risk Level</th><th>Suggestion</th></tr>"""
+<h2>🔍 Code Review Summary</h2>"""
 
-for finding in findings:
-    html_content += f"<tr><td>{finding['Change Type']}</td><td>{finding['Details']}</td><td>{finding['Risk Level']}</td><td>{finding['Suggestion']}</td></tr>"
+if findings:
+    html_content += "<table>\n<tr><th>Change Type</th><th>Details</th><th>Risk Level</th><th>Suggestion</th></tr>"
+    for finding in findings:
+        html_content += f"<tr><td>{finding['Change Type']}</td><td>{finding['Details']}</td><td>{finding['Risk Level']}</td><td>{finding['Suggestion']}</td></tr>"
+    html_content += "</table>"
+else:
+    html_content += "<p>No issues found.</p>"
 
-html_content += "</table></body></html>"
+html_content += "</body></html>"
 
 with open("diff.html", "w", encoding="utf-8") as f:
     f.write(html_content)
