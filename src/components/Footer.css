@@ -1,0 +1,80 @@
+/* Modern, vibrant Flipkart-inspired footer */
+.footer {
+  background: linear-gradient(90deg, #2874f0 0%, #0059b2 100%);
+  color: #fff;
+  padding: 2.5rem 0 1.5rem 0;
+  margin-top: auto;
+  box-shadow: 0 -2px 16px rgba(40, 116, 240, 0.08);
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2.5rem;
+}
+
+.footer-section h3 {
+  margin-bottom: 1.2rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #ffe500;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.footer-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-section ul li {
+  margin-bottom: 0.7rem;
+}
+
+.footer-section ul li a {
+  color: #fff;
+  text-decoration: none;
+  font-size: 1rem;
+  opacity: 0.92;
+  transition: color 0.2s, opacity 0.2s;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+}
+
+.footer-section ul li a:hover {
+  color: #ffe500;
+  opacity: 1;
+  border-bottom: 1px solid #ffe500;
+}
+
+.footer-bottom {
+  text-align: center;
+  padding-top: 2.2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin-top: 2.5rem;
+  font-size: 0.98rem;
+  letter-spacing: 0.2px;
+  opacity: 0.95;
+}
+
+@media (max-width: 900px) {
+  .footer-content {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .footer {
+    padding: 2rem 0 1rem 0;
+  }
+}
