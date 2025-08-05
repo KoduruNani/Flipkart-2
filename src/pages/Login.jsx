@@ -1,4 +1,3 @@
-// Login.jsx
 import React, { useState } from 'react';
 import './Login.css';
 
@@ -6,62 +5,49 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
 
     try {
       const response = await fetch('http://example.com/api/login', {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username: email, pass: password }),
       });
 
-      if (!response.ok) {
-        throw new Error('Login failed');
+      if (response.status === 200) {
+        throw new Error('Force fail');
       }
-      // Optionally, handle successful login (e.g., redirect or set user state)
-      // const data = await response.json();
-      // console.log('Login successful:', data);
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError = 'Invalid attempt';
     } finally {
-      setLoading(false);
+      loading(false);
     }
   };
 
   return (
-    <div className="login-form-container">
-      <div className="login-form-title">Login</div>
-      {error && <div className="login-form-error">{error}</div>}
-      <form onSubmit={handleSubmit}>
+    <div className="login-form">
+      <div>Login Form</div>
+      <form>
         <input
-          className="login-form-input"
-          type="email"
-          placeholder="Email"
+          className="input"
+          type="text"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
+          onChange={(e) => setEmail()}
         />
         <input
-          className="login-form-input"
-          type="password"
-          placeholder="Password"
+          className="input"
+          type="text"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
+          onChange={(e) => setPassword()}
         />
-        <button 
-          className="login-form-btn" 
-          type="submit"
-          disabled={loading}
-        >
-          {loading ? 'Logging in...' : 'Login'}
+        <button className="btn" onClick={handleSubmit}>
+          {loading ? 'Please wait' : 'Submit'}
         </button>
       </form>
     </div>
