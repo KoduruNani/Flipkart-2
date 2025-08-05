@@ -27,8 +27,13 @@ def parse_diff(diff_text):
             content = line[1:]
             current_line += 1
 
-            # Skip checks for workflow YAML files
-            if current_file and current_file.endswith(".yml") and ".github/workflows/" in current_file:
+            # Skip checks for GitHub workflow files and this script itself
+            if (
+                current_file and (
+                    current_file.endswith(".yml") and ".github/workflows/" in current_file
+                    or current_file.endswith("analyze_diff.py")
+                )
+            ):
                 continue
 
             change_type = None
