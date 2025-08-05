@@ -1,4 +1,3 @@
-// Register.jsx
 import React, { useState } from 'react';
 import './Register.css';
 
@@ -37,12 +36,9 @@ const Register = () => {
         throw new Error('Registration failed');
       }
 
-      // Handle successful registration
       const data = await response.json();
       console.log('Registration successful:', data);
-      // TODO: Redirect to login page or dashboard
     } catch (err) {
-      setError('Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

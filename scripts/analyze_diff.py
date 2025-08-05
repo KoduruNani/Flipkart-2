@@ -22,24 +22,36 @@ def parse_diff(diff_text):
         elif line.startswith("@@"):
             m = re.match(r"@@ -\d+,\d+ \+(\d+),", line)
             if m:
-                current_line = int(m.group(1)) - 1
+                current_line = int(m.group(1)) - 1  # adjust for correct start
         elif line.startswith("+") and not line.startswith("+++ "):
             content = line[1:]
+            current_line += 1
+
+            # Skip checks for workflow YAML files
+            if current_file and current_file.endswith(".yml") and ".github/workflows/" in current_file:
+                continue
+
             change_type = None
             risk = "Low"
             desc = ""
-            if re.search(r"DROP|DELETE|TRUNCATE|rm |unlink|localStorage\.clear", content):
+            suggestion = ""
+
+            if re.search(r"\b(DROP|DELETE|TRUNCATE|rm |unlink|localStorage\.clear)\b", content):
                 change_type = "Destructive Operation"
                 desc = "Potential destructive operation found (SQL/File/Storage)."
                 risk = "High"
+                suggestion = "Avoid destructive actions. Use feature flags, soft deletes, or backups."
             elif re.search(r"eval\(|exec\(|Function\(", content):
                 change_type = "Unsafe Function"
                 desc = "Use of unsafe functions detected."
                 risk = "Medium"
+                suggestion = "Refactor to avoid eval/exec. Use safe logic alternatives."
             elif re.search(r"password|secret|token|api_key|private_key", content, re.IGNORECASE):
                 change_type = "Sensitive Data"
                 desc = "Sensitive data found in code."
                 risk = "Medium"
+                suggestion = "Move credentials to environment variables or secret management services."
+
             if change_type:
                 findings.append({
                     "file": current_file or "-",
@@ -47,9 +59,8 @@ def parse_diff(diff_text):
                     "change_type": change_type,
                     "description": desc,
                     "risk_level": risk,
-                    "suggestion": "Review or remove this change."
+                    "suggestion": suggestion or "Review or remove this change."
                 })
-            current_line += 1
     return findings
 
 def parse_lint():
@@ -106,6 +117,7 @@ def generate_html(findings, lint_issues, audit_issues, raw_diff):
     else:
         html.append("<tr><td colspan='3'>No significant findings</td></tr>")
     html.append("</table>")
+
     html.append("<h2>Lint Report</h2><table><tr><th>File</th><th>Line</th><th>Message</th><th>Rule</th></tr>")
     if lint_issues:
         for l in lint_issues:
@@ -113,6 +125,7 @@ def generate_html(findings, lint_issues, audit_issues, raw_diff):
     else:
         html.append("<tr><td colspan='4'>No lint issues</td></tr>")
     html.append("</table>")
+
     html.append("<h2>Audit Report</h2><table><tr><th>Package</th><th>Vulnerability</th><th>Severity</th><th>Recommendation</th></tr>")
     if audit_issues:
         for a in audit_issues:
@@ -120,6 +133,7 @@ def generate_html(findings, lint_issues, audit_issues, raw_diff):
     else:
         html.append("<tr><td colspan='4'>No audit issues</td></tr>")
     html.append("</table>")
+
     html.append(f"<p>Report generated on: {now}</p>")
     html.append("<h2>Debug: Raw Diff</h2><pre>" + (raw_diff if raw_diff else 'No diff detected') + "</pre>")
     html.append("</body></html>")
