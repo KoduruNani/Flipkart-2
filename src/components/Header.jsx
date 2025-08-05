@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { searchProducts } from '../services/productService';
+import { FLIPKART_LOGO_URL, FLIPKART_PLUS_ICON_URL } from '../config';
 import './Header.css';
 
 const Header = () => {
@@ -61,7 +62,7 @@ const Header = () => {
           <Link to="/" className="header__logo-link">
             <div className="header__logo-wrapper">
               <img 
-                src="https://static-assets-web.flixcart.com/fk-p-linx/fk-cp-zion/img/flipkart-plus_8d85f4.png" 
+                src={FLIPKART_LOGO_URL}
                 alt="Flipkart" 
                 className="header__logo-img" 
               />
@@ -70,7 +71,7 @@ const Header = () => {
                 <span className="header__explore">
                   Explore <span className="header__plus">Plus</span>
                   <img 
-                    src="https://static-assets-web.flixcart.com/fk-p-linx/fk-cp-zion/img/plus_aef861.png" 
+                    src={FLIPKART_PLUS_ICON_URL}
                     className="header__plus-icon"
                     alt="Flipkart Plus Icon"
                   />
@@ -80,6 +81,8 @@ const Header = () => {
           </Link>
           <nav className="header__nav">
             <Link to="/products" className="header__nav-link">Products</Link>
+            <Link to="/cart" className="header__nav-link">Cart</Link>
+            <Link to="/wishlist" className="header__nav-link">Wishlist</Link>
           </nav>
         </div>
 

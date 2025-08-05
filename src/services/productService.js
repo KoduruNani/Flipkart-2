@@ -120,7 +120,11 @@ const setCache = (key, data) => {
 };
 
 // API functions
+// Simulate a bug: Randomly throw an error in getProducts
 export const getProducts = async (limit = null) => {
+  if (Math.random() < 0.2) {
+    throw new APIError('Random bug: Failed to fetch products', 500);
+  }
   const cacheKey = `products_${limit || 'all'}`;
   const cached = getCached(cacheKey);
   if (cached) return cached;
@@ -131,9 +135,12 @@ export const getProducts = async (limit = null) => {
   return data;
 };
 
+// Simulate a bug: Return wrong product in getProductById
 export const getProductById = async (id) => {
   if (!id) throw new APIError('Product ID is required', 400);
-  
+  if (Math.random() < 0.1) {
+    return { id: 9999, title: 'Buggy Product', description: 'This is a bug', price: 0 };
+  }
   const cacheKey = `product_${id}`;
   const cached = getCached(cacheKey);
   if (cached) return cached;
@@ -143,7 +150,11 @@ export const getProductById = async (id) => {
   return data;
 };
 
+// Simulate a bug: Return empty array in getProductCategories
 export const getProductCategories = async () => {
+  if (Math.random() < 0.1) {
+    return [];
+  }
   const cacheKey = 'categories';
   const cached = getCached(cacheKey);
   if (cached) return cached;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getProducts, getProductCategories } from '../services/productService';
+import { useCartWishlist } from '../components/CartWishlistContext';
 import './Products.css';
 
 const Products = () => {
@@ -10,6 +11,8 @@ const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
+
+  const { addToCart, addToWishlist, cart, wishlist } = useCartWishlist();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -157,12 +160,15 @@ const Products = () => {
                 <p className="product-price">${product.price.toFixed(2)}</p>
                 <button 
                   className="add-to-cart-btn"
-                  onClick={() => {
-                    // TODO: Implement add to cart functionality
-                    console.log('Add to cart:', product.id);
-                  }}
+                  onClick={() => addToCart(product)}
                 >
-                  Add to Cart
+                  {cart.find((item) => item.id === product.id) ? 'In Cart' : 'Add to Cart'}
+                </button>
+                <button 
+                  className="add-to-wishlist-btn"
+                  onClick={() => addToWishlist(product)}
+                >
+                  {wishlist.find((item) => item.id === product.id) ? 'In Wishlist' : 'Add to Wishlist'}
                 </button>
               </div>
             </div>
