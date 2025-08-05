@@ -9,6 +9,7 @@ on:
       - develop
 
 permissions:
+  contents: read
   issues: write
   pull-requests: write
 
@@ -100,7 +101,7 @@ jobs:
             echo "RISK_LEVEL=Low" >> $GITHUB_ENV
           fi
 
-      - name: Upload Diff for Review
+      - name: Upload Diff Report
         uses: actions/upload-artifact@v4
         with:
           name: code-diff-analysis
@@ -112,7 +113,6 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
             const summary = `
 ## 🧪 Code Analysis Summary
 - **Risk Level**: ${process.env.RISK_LEVEL}
@@ -120,7 +120,7 @@ jobs:
 - **Security Audit**: ${process.env.AUDIT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
 - **File Deletions**: ${process.env.DELETIONS_FOUND === 'true' ? '⚠️ Yes' : '✅ No'}
 
-📄 [View Full Report](${context.payload.repository.html_url}/actions/runs/${context.runId}/artifacts)
+📄 [View Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)
 `;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -129,15 +129,16 @@ jobs:
               body: summary
             });
 
-      - name: Check Results
+      - name: Final Gate Check
         if: always()
         run: |
-          if [ "${{ env.LINT_STATUS }}" != "0" ] && [ ! -z "${{ env.LINT_STATUS }}" ]; then
-            echo "::warning::Linting issues found. Please review the logs."
+          if [ "${{ env.LINT_STATUS }}" != "0" ]; then
+            echo "::warning::Lint issues found."
           fi
-          if [ "${{ env.AUDIT_STATUS }}" != "0" ] && [ ! -z "${{ env.AUDIT_STATUS }}" ]; then
-            echo "::warning::Security vulnerabilities detected. Please review the audit report."
+          if [ "${{ env.AUDIT_STATUS }}" != "0" ]; then
+            echo "::warning::Security audit issues found."
           fi
           if [ "${{ env.DELETIONS_FOUND }}" == "true" ] || [ "${{ env.RISK_LEVEL }}" == "High" ]; then
-            echo "::error::Action required: File deletions or High risk detected. Manual review required."
+            echo "::error::Manual review required due to deletions or high-risk changes."
+            exit 1
           fi
