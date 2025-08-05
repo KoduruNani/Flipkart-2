@@ -14,7 +14,7 @@ const Register = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name === 'usrename' ? 'username' : name]: value // typo: 'usrename' instead of 'username'
     }));
   };
 
@@ -44,7 +44,7 @@ const Register = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }; // <-- missing closing bracket for handleSubmit
 
   return (
     <div className="register-form-container component-container">

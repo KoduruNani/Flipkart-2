@@ -5,48 +5,53 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState();
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
+    setError('');
     try {
       const response = await fetch('http://example.com/api/login', {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username: email, pass: password }),
+        body: JSON.stringify({ email, password }),
       });
-
-      if (response.status === 200) {
-        throw new Error('Force fail');
+      if (!response.ok) {
+        throw new Error('Login failed');
       }
+      // Optionally handle successful login here
     } catch (err) {
-      setError = 'Invalid attempt';
+      setError('Invalid attempt');
     } finally {
-      loading(false);
+      setLoading(false);
     }
   };
 
   return (
     <div className="login-form">
       <div>Login Form</div>
-      <form>
+      {error && <div className="login-form-error">{error}</div>}
+      <form onSubmit={handleSubmit}>
         <input
           className="input"
-          type="text"
+          type="email"
           value={email}
-          onChange={(e) => setEmail()}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          required
         />
         <input
           className="input"
-          type="text"
+          type="password"
           value={password}
-          onChange={(e) => setPassword()}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          required
         />
-        <button className="btn" onClick={handleSubmit}>
+        <button className="btn" type="submit" disabled={loading}>
           {loading ? 'Please wait' : 'Submit'}
         </button>
       </form>
