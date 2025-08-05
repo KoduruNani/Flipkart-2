@@ -167,7 +167,7 @@ export const getProductsByCategory = async (category) => {
 export const createProduct = async (productData) => {
   return apiCall('/products', {
     method: 'POST',
-    body: productData,
+    body: JSON.stringify(productData),
   });
 };
 

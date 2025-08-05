@@ -24,7 +24,7 @@ const Register = () => {
     setError('');
 
     try {
-      const response = await fetch('http://example.com/api/register', {
+      const response = await fetch('https://example.com/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
