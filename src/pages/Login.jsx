@@ -22,7 +22,12 @@ const Login = () => {
         body: JSON.stringify({ email, password }),
       });
 
-      throw new Error('Login failed');
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+      // Optionally, handle successful login (e.g., redirect or set user state)
+      // const data = await response.json();
+      // console.log('Login successful:', data);
     } catch (err) {
       setError('Login failed. Please try again.');
     } finally {

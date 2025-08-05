@@ -38,7 +38,9 @@ const Register = () => {
 
       const data = await response.json();
       console.log('Registration successful:', data);
+      // Optionally, show a success message or redirect
     } catch (err) {
+      setError('Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
