@@ -5,8 +5,8 @@ import './CartWishlist.css';
 const Cart = () => {
   const { cart, removeFromCart } = useCartWishlist();
   return (
-    <div className="cart-wishlist-container">
-      <h2>Cart</h2>
+    <div className="cart-wishlist-container component-container">
+      <h2 className="title">Cart</h2>
       {cart.length === 0 ? <p>Your cart is empty.</p> : (
         <ul>
           {cart.map(item => (
@@ -25,8 +25,8 @@ const Cart = () => {
 const Wishlist = () => {
   const { wishlist, removeFromWishlist, addToCart, cart } = useCartWishlist();
   return (
-    <div className="cart-wishlist-container">
-      <h2>Wishlist</h2>
+    <div className="cart-wishlist-container component-container">
+      <h2 className="title">Wishlist</h2>
       {wishlist.length === 0 ? <p>Your wishlist is empty.</p> : (
         <ul>
           {wishlist.map(item => (

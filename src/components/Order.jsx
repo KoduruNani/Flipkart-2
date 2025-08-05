@@ -7,8 +7,8 @@ const Order = ({ order }) => {
   }
 
   return (
-    <div className="order-container">
-      <h2>Order Summary</h2>
+    <div className="order-container component-container">
+      <h2 className="title">Order Summary</h2>
       <div className="order-info">
         <div><strong>Order ID:</strong> {order.id}</div>
         <div><strong>Date:</strong> {order.date}</div>

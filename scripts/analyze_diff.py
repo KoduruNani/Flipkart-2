@@ -22,7 +22,7 @@ def parse_diff(diff_text):
         elif line.startswith("@@"):
             m = re.match(r"@@ -\d+,\d+ \+(\d+),", line)
             if m:
-                current_line = int(m.group(1))
+                current_line = int(m.group(1)) - 1
         elif line.startswith("+") and not line.startswith("+++ "):
             content = line[1:]
             change_type = None

@@ -49,8 +49,8 @@ const Register = () => {
   };
 
   return (
-    <div className="register-form-container">
-      <div className="register-form-title">Register</div>
+    <div className="register-form-container component-container">
+      <div className="register-form-title title">Register</div>
       {error && <div className="register-form-error">{error}</div>}
       <form onSubmit={handleSubmit}>
         <input
