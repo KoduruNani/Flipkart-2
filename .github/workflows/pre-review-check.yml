@@ -129,7 +129,7 @@ jobs:
             });
 
       - name: Final Gate Check
-        if: always()
+        if: always() 
         run: |
           if [ "${{ env.LINT_STATUS }}" != "0" ]; then
             echo "::warning::Lint issues found."

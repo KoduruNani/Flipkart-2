@@ -5,7 +5,7 @@ TARGET_FILES = ["src/pages/Register.jsx", "src/pages/Dashboard.jsx"]
 findings = []
 
 def scan_file(filename):
-    file_findings = []
+    file_findings = [] 
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             lines = f.readlines()
