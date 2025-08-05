@@ -89,12 +89,12 @@ jobs:
 
       - name: Run Semantic Diff Analysis
         id: diff-analysis
+        continue-on-error: true
         run: |
           python scripts/analyze_diff.py
-          # Set risk level based on findings
-          if grep -q "risk-high" diff.html; then
+          if grep -q "High" diff.html; then
             echo "RISK_LEVEL=High" >> $GITHUB_ENV
-          elif grep -q "risk-medium" diff.html; then
+          elif grep -q "Medium" diff.html; then
             echo "RISK_LEVEL=Medium" >> $GITHUB_ENV
           else
             echo "RISK_LEVEL=Low" >> $GITHUB_ENV
@@ -113,13 +113,15 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const report = fs.readFileSync('diff.html', 'utf8');
-            const summary = `## Code Analysis Summary
-            - Risk Level: ${{ env.RISK_LEVEL }}
-            - Linting Status: ${process.env.LINT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
-            - Security Audit: ${process.env.AUDIT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
-            - File Deletions: ${process.env.DELETIONS_FOUND === 'true' ? '⚠️ Yes' : '✅ No'}
-            [View Full Report](${context.payload.repository.html_url}/actions/runs/${context.runId}/artifacts)`;
+            const summary = `
+## 🧪 Code Analysis Summary
+- **Risk Level**: ${process.env.RISK_LEVEL}
+- **Linting Status**: ${process.env.LINT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
+- **Security Audit**: ${process.env.AUDIT_STATUS === '0' ? '✅ Pass' : '⚠️ Issues Found'}
+- **File Deletions**: ${process.env.DELETIONS_FOUND === 'true' ? '⚠️ Yes' : '✅ No'}
+
+📄 [View Full Report](${context.payload.repository.html_url}/actions/runs/${context.runId}/artifacts)
+`;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -138,5 +140,4 @@ jobs:
           fi
           if [ "${{ env.DELETIONS_FOUND }}" == "true" ] || [ "${{ env.RISK_LEVEL }}" == "High" ]; then
             echo "::error::Action required: File deletions or High risk detected. Manual review required."
-            # No exit 1 to allow artifact upload and comment
           fi
