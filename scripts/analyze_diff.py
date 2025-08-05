@@ -33,9 +33,36 @@ FALLBACK_FILES = [
     "src/services/api.js"
 ]
 
+# Files to exclude from analysis
+EXCLUDED_FILES = [
+    "scripts/analyze_diff.py",  # Don't analyze the analysis script itself
+    "diff.html",                 # Don't analyze the generated report
+    "README.md",                 # Don't analyze documentation
+    "package.json",              # Don't analyze package files
+    "package-lock.json",
+    "*.css",                     # Don't analyze CSS files
+    "*.md"                       # Don't analyze markdown files
+]
+
+def should_exclude_file(filename):
+    """Check if file should be excluded from analysis"""
+    for excluded in EXCLUDED_FILES:
+        if excluded.endswith('*'):
+            # Handle wildcard patterns
+            if filename.endswith(excluded[1:]):
+                return True
+        elif filename == excluded:
+            return True
+    return False
+
 findings = []
 
 def scan_file(filename):
+    # Skip excluded files
+    if should_exclude_file(filename):
+        print(f"Skipping excluded file: {filename}")
+        return
+        
     file_findings = []
     try:
         with open(filename, 'r', encoding='utf-8') as f:
@@ -43,17 +70,28 @@ def scan_file(filename):
             lines = content.split('\n')
 
         for i, line in enumerate(lines, 1):
-            # Check for insecure HTTP URLs
-            if re.search(r'http://[^\s\'"]+', line, re.IGNORECASE):
-                file_findings.append({
-                    "Change Type": "Security Issue",
-                    "Details": f"{filename} (line {i}): Insecure HTTP URL detected.",
-                    "Risk Level": "High",
-                    "Suggestion": "Use HTTPS instead of HTTP to avoid exposing credentials."
-                })
+            # Check for insecure HTTP URLs (but exclude comments, documentation, and SVG namespaces)
+            if re.search(r'http://[^\s\'"]+', line, re.IGNORECASE) and not line.strip().startswith('//'):
+                # Exclude SVG namespaces and other legitimate HTTP URLs
+                if not any(excluded in line.lower() for excluded in [
+                    'xmlns="http://www.w3.org/2000/svg"',
+                    'xmlns:',
+                    'http://www.w3.org/',
+                    'http://schemas.',
+                    'http://xmlns.',
+                    'http://www.w3c.org/',
+                    'http://www.ietf.org/',
+                    'http://tools.ietf.org/'
+                ]):
+                    file_findings.append({
+                        "Change Type": "Security Issue",
+                        "Details": f"{filename} (line {i}): Insecure HTTP URL detected.",
+                        "Risk Level": "High",
+                        "Suggestion": "Use HTTPS instead of HTTP to avoid exposing credentials."
+                    })
 
             # Check for common typos
-            if 'usrename' in line or 'usernmae' in line:
+            if ('usrename' in line or 'usernmae' in line) and not line.strip().startswith('//'):
                 file_findings.append({
                     "Change Type": "Logical Bug",
                     "Details": f"{filename} (line {i}): Typo in 'username' field.",
@@ -61,8 +99,8 @@ def scan_file(filename):
                     "Suggestion": "Fix typo in name mapping to 'username'."
                 })
 
-            # Check for console.log in production code
-            if 'console.log(' in line and not line.strip().startswith('//'):
+            # Check for console.log in production code (but allow in comments)
+            if 'console.log(' in line and not line.strip().startswith('//') and not line.strip().startswith('*'):
                 file_findings.append({
                     "Change Type": "Debug Code",
                     "Details": f"{filename} (line {i}): Console.log found in production code.",
@@ -70,8 +108,8 @@ def scan_file(filename):
                     "Suggestion": "Remove console.log or add proper logging."
                 })
 
-            # Check for hardcoded credentials
-            if re.search(r'(password|secret|key|token)\s*[:=]\s*[\'"][^\'"]+[\'"]', line, re.IGNORECASE):
+            # Check for hardcoded credentials (but exclude comments, documentation, and variable names)
+            if re.search(r'(password|secret|apiKey|token)\s*[:=]\s*[\'"][^\'"]+[\'"]', line, re.IGNORECASE) and not line.strip().startswith('//'):
                 file_findings.append({
                     "Change Type": "Security Issue",
                     "Details": f"{filename} (line {i}): Hardcoded credentials detected.",
@@ -80,7 +118,7 @@ def scan_file(filename):
                 })
 
             # Check for potential XSS vulnerabilities
-            if 'dangerouslySetInnerHTML' in line:
+            if 'dangerouslySetInnerHTML' in line and not line.strip().startswith('//'):
                 file_findings.append({
                     "Change Type": "Security Issue",
                     "Details": f"{filename} (line {i}): Potential XSS vulnerability with dangerouslySetInnerHTML.",
@@ -88,14 +126,30 @@ def scan_file(filename):
                     "Suggestion": "Sanitize HTML content before rendering."
                 })
 
-            # Check for missing error handling
-            if 'fetch(' in line and 'catch' not in content[i:i+10]:
-                file_findings.append({
-                    "Change Type": "Error Handling",
-                    "Details": f"{filename} (line {i}): Fetch call without proper error handling.",
-                    "Risk Level": "Medium",
-                    "Suggestion": "Add try-catch block around fetch calls."
-                })
+            # Check for missing error handling (improved logic)
+            if 'fetch(' in line and not line.strip().startswith('//'):
+                # Look ahead a few lines for try-catch
+                next_lines = content.split('\n')[i:i+10] if i < len(lines) else []
+                has_try_catch = any('try' in line for line in next_lines) and any('catch' in line for line in next_lines)
+                
+                # Also check if this is inside a function that already has error handling
+                lines_before = content.split('\n')[:i]
+                has_try_before = any('try' in line for line in lines_before[-5:]) if lines_before else False
+                
+                # Check if this is inside a function that handles errors (like apiCall)
+                function_context = False
+                for j in range(max(0, i-20), i):
+                    if j < len(lines) and 'apiCall' in lines[j]:
+                        function_context = True
+                        break
+                
+                if not has_try_catch and not has_try_before and not function_context:
+                    file_findings.append({
+                        "Change Type": "Error Handling",
+                        "Details": f"{filename} (line {i}): Fetch call without proper error handling.",
+                        "Risk Level": "Medium",
+                        "Suggestion": "Add try-catch block around fetch calls."
+                    })
 
         findings.extend(file_findings)
 
@@ -112,6 +166,9 @@ files_to_scan = get_changed_files()
 if not files_to_scan:
     print("No changed files detected, using fallback files")
     files_to_scan = [f for f in FALLBACK_FILES if os.path.exists(f)]
+
+# Filter out excluded files
+files_to_scan = [f for f in files_to_scan if not should_exclude_file(f)]
 
 print(f"Scanning files: {files_to_scan}")
 

@@ -11,20 +11,23 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
     try {
-      const response = await fetch('http://example.com/api/login', {
+      const response = await fetch('https://example.com/api/login', { // FIXED: Use HTTPS
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
       });
+      
       if (!response.ok) {
-        throw new Error('Login failed');
+        throw new Error(`Login failed: ${response.status}`);
       }
+      
       // Optionally handle successful login here
     } catch (err) {
-      setError('Invalid attempt');
+      setError(`Login failed: ${err.message}`);
     } finally {
       setLoading(false);
     }

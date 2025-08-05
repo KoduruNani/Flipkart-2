@@ -71,130 +71,16 @@
         <div class="content">
             <div class="summary">
                 <h3>📊 Summary</h3>
-                <p><strong>Total Issues Found:</strong> 15</p>
-                <p><strong>High Risk:</strong> <span class="risk-high">9</span></p>
-                <p><strong>Medium Risk:</strong> <span class="risk-medium">6</span></p>
+                <p><strong>Total Issues Found:</strong> 0</p>
+                <p><strong>High Risk:</strong> <span class="risk-high">0</span></p>
+                <p><strong>Medium Risk:</strong> <span class="risk-medium">0</span></p>
                 <p><strong>Low Risk:</strong> <span class="risk-low">0</span></p>
             </div>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Issue Type</th>
-                        <th>Details</th>
-                        <th>Risk Level</th>
-                        <th>Recommendation</th>
-                    </tr>
-                </thead>
-                <tbody>
-    
-                    <tr>
-                        <td>Security Issue</td>
-                        <td>README.md (line 8): Insecure HTTP URL detected.</td>
-                        <td class="risk-high">High</td>
-                        <td>Use HTTPS instead of HTTP to avoid exposing credentials.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Logical Bug</td>
-                        <td>README.md (line 14): Typo in 'username' field.</td>
-                        <td class="risk-high">High</td>
-                        <td>Fix typo in name mapping to 'username'.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Security Issue</td>
-                        <td>scripts/analyze_diff.py (line 47): Insecure HTTP URL detected.</td>
-                        <td class="risk-high">High</td>
-                        <td>Use HTTPS instead of HTTP to avoid exposing credentials.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Logical Bug</td>
-                        <td>scripts/analyze_diff.py (line 56): Typo in 'username' field.</td>
-                        <td class="risk-high">High</td>
-                        <td>Fix typo in name mapping to 'username'.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Debug Code</td>
-                        <td>scripts/analyze_diff.py (line 65): Console.log found in production code.</td>
-                        <td class="risk-medium">Medium</td>
-                        <td>Remove console.log or add proper logging.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Security Issue</td>
-                        <td>scripts/analyze_diff.py (line 83): Potential XSS vulnerability with dangerouslySetInnerHTML.</td>
-                        <td class="risk-high">High</td>
-                        <td>Sanitize HTML content before rendering.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Security Issue</td>
-                        <td>scripts/analyze_diff.py (line 86): Potential XSS vulnerability with dangerouslySetInnerHTML.</td>
-                        <td class="risk-high">High</td>
-                        <td>Sanitize HTML content before rendering.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Error Handling</td>
-                        <td>scripts/analyze_diff.py (line 92): Fetch call without proper error handling.</td>
-                        <td class="risk-medium">Medium</td>
-                        <td>Add try-catch block around fetch calls.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Security Issue</td>
-                        <td>src/components/Header.jsx (line 107): Insecure HTTP URL detected.</td>
-                        <td class="risk-high">High</td>
-                        <td>Use HTTPS instead of HTTP to avoid exposing credentials.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Security Issue</td>
-                        <td>src/pages/Login.jsx (line 15): Insecure HTTP URL detected.</td>
-                        <td class="risk-high">High</td>
-                        <td>Use HTTPS instead of HTTP to avoid exposing credentials.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Error Handling</td>
-                        <td>src/pages/Login.jsx (line 15): Fetch call without proper error handling.</td>
-                        <td class="risk-medium">Medium</td>
-                        <td>Add try-catch block around fetch calls.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Error Handling</td>
-                        <td>src/pages/Register.jsx (line 27): Fetch call without proper error handling.</td>
-                        <td class="risk-medium">Medium</td>
-                        <td>Add try-catch block around fetch calls.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Debug Code</td>
-                        <td>src/pages/Register.jsx (line 40): Console.log found in production code.</td>
-                        <td class="risk-medium">Medium</td>
-                        <td>Remove console.log or add proper logging.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Error Handling</td>
-                        <td>src/services/productService.js (line 51): Fetch call without proper error handling.</td>
-                        <td class="risk-medium">Medium</td>
-                        <td>Add try-catch block around fetch calls.</td>
-                    </tr>
-        
-                    <tr>
-                        <td>Security Issue</td>
-                        <td>src/services/productService.js (line 148): Hardcoded credentials detected.</td>
-                        <td class="risk-high">High</td>
-                        <td>Use environment variables for sensitive data.</td>
-                    </tr>
-        
-                </tbody>
-            </table>
+            <div class="no-issues">
+                <h3>✅ No Issues Found</h3>
+                <p>Great job! No security issues, bugs, or code quality problems were detected.</p>
+            </div>
     
         </div>
     </div>

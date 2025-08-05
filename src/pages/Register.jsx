@@ -24,7 +24,7 @@ const Register = () => {
     setError('');
 
     try {
-      const response = await fetch('https://example.com/api/register', {
+      const response = await fetch('https://example.com/api/register', { // FIXED: Use HTTPS
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -33,14 +33,14 @@ const Register = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Registration failed');
+        throw new Error(`Registration failed: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Registration successful:', data);
+      // FIXED: Remove console.log, handle success properly
       // Optionally, show a success message or redirect
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      setError(`Registration failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
